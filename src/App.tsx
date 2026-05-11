@@ -1,5 +1,4 @@
 import { Routes, Route, Navigate } from "react-router";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Sidebar } from "./components/Sidebar";
 import { Library } from "./routes/Library";
 import { Search } from "./routes/Search";
@@ -9,25 +8,12 @@ import { Browse } from "./routes/Browse";
 import { Book } from "./routes/Book";
 
 export default function App() {
-  async function handleDragStart(e: React.MouseEvent) {
-    if (e.button !== 0) return;
-    try {
-      await getCurrentWindow().startDragging();
-    } catch {
-      // ignore — non-Tauri environments (e.g. browser preview)
-    }
-  }
-
   return (
     <div className="relative flex h-full w-full bg-paper text-ink">
-      {/* Full-width drag bar overlaying the top of the window. Uses both the
-          declarative attribute (when WebKit honors it) and a programmatic
-          mousedown handler so dragging is reliable across cold starts. */}
-      <div
-        data-tauri-drag-region
-        onMouseDown={handleDragStart}
-        className="fixed inset-x-0 top-0 z-50 h-10"
-      />
+      {/* Native macOS drag region — Tauri's WebView intercepts mousedown on
+          this attribute. Keep it as `absolute` (not `fixed`) and plain — a
+          JS mousedown handler here will fight the native intercept. */}
+      <div data-tauri-drag-region className="absolute inset-x-0 top-0 z-40 h-10" />
       <Sidebar />
       <main className="flex-1 overflow-y-auto pt-10">
         <Routes>
