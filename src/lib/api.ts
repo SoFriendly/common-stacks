@@ -91,6 +91,17 @@ export interface DownloadedFile {
   extension?: string;
 }
 
+export interface EpubMetadata {
+  title?: string;
+  authors: string[];
+  identifiers: string[];
+  language?: string;
+  description?: string;
+  publisher?: string;
+  subjects: string[];
+  cover_data_url?: string;
+}
+
 export interface ValidateResult {
   ok: boolean;
   title?: string;
@@ -119,6 +130,7 @@ export const api = {
   }) => invoke<{ path: string }>("download_book", { request }),
 
   listDownloads: () => invoke<DownloadedFile[]>("list_downloads"),
+  inspectDownload: (path: string) => invoke<EpubMetadata>("inspect_download", { path }),
   revealDownload: (path: string) => invoke<void>("reveal_download", { path }),
   deleteDownload: (path: string) => invoke<void>("delete_download", { path }),
   renameDownload: (path: string, newName: string) =>

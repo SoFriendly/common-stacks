@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { api, type Feed } from "../lib/api";
 import { CoverCard } from "../components/CoverCard";
 import { CategoryTile } from "../components/CategoryTile";
+import { openEntry } from "../lib/entry";
 
 export function Browse() {
   const [params] = useSearchParams();
@@ -107,11 +108,7 @@ export function Browse() {
                 title={e.title}
                 authors={e.authors}
                 cover={e.cover ?? e.thumbnail}
-                onClick={() =>
-                  navigate("/book", {
-                    state: { sourceId, entry: e },
-                  })
-                }
+                onClick={() => openEntry(navigate, { sourceId, entry: e })}
               />
             ))}
           </div>

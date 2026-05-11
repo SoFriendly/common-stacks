@@ -35,6 +35,7 @@ pub fn run() {
             commands::search,
             commands::download_book,
             commands::list_downloads,
+            commands::inspect_download,
             commands::reveal_download,
             commands::delete_download,
             commands::rename_download,

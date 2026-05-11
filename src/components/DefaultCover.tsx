@@ -122,9 +122,11 @@ export function DefaultCover({ title, author, className }: Props) {
   const sizing = pickTitleSizing(title);
   const lines = sizing.lines;
   const lineHeight = sizing.fontSize * 1.25;
-  // Vertically center the title in the upper ~75% of the cover.
-  const blockHeight = lines.length * lineHeight;
-  const startY = 30 + (180 - blockHeight) / 2 + sizing.fontSize * 0.85;
+  // When there's no author (category card), anchor the title near the top.
+  // Otherwise vertically center it in the upper ~75% of the cover.
+  const startY = author
+    ? 30 + (180 - lines.length * lineHeight) / 2 + sizing.fontSize * 0.85
+    : 28 + sizing.fontSize * 0.85;
   return (
     <svg
       viewBox="0 0 200 300"

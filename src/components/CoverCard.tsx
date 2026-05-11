@@ -10,10 +10,20 @@ interface Props {
   onClick?: () => void;
 }
 
+type CoverState =
+  | { kind: "loading" }
+  | { kind: "real" }
+  | { kind: "icon"; natural: number }
+  | { kind: "failed" };
+
+const SMALL_IMAGE_PX = 96; // anything narrower than this is treated as an icon
+
 export function CoverCard({ title, authors, cover, className, onClick }: Props) {
-  const [failed, setFailed] = useState(false);
-  const showCover = cover && !failed;
+  const [state, setState] = useState<CoverState>(
+    cover ? { kind: "loading" } : { kind: "failed" },
+  );
   const author = authors?.[0];
+
   return (
     <button
       onClick={onClick}
@@ -23,16 +33,39 @@ export function CoverCard({ title, authors, cover, className, onClick }: Props) 
       )}
     >
       <div className="relative aspect-[2/3] w-full overflow-hidden rounded-md bg-shelf shadow-sm ring-1 ring-black/5 transition-shadow group-hover:shadow-lg">
-        {showCover ? (
+        {cover && state.kind !== "failed" && state.kind !== "icon" && (
           <img
             src={cover}
             alt={title}
             loading="lazy"
-            className="h-full w-full object-cover"
-            onError={() => setFailed(true)}
+            className={cn(
+              "h-full w-full object-cover transition-opacity",
+              state.kind === "loading" ? "opacity-0" : "opacity-100",
+            )}
+            onLoad={(e) => {
+              const w = e.currentTarget.naturalWidth;
+              if (w > 0 && w < SMALL_IMAGE_PX) {
+                setState({ kind: "icon", natural: w });
+              } else {
+                setState({ kind: "real" });
+              }
+            }}
+            onError={() => setState({ kind: "failed" })}
           />
-        ) : (
-          <DefaultCover title={title} author={author} className="h-full w-full" />
+        )}
+        {(state.kind === "failed" || state.kind === "icon" || state.kind === "loading") && (
+          <DefaultCover title={title} author={author} className="absolute inset-0 h-full w-full" />
+        )}
+        {state.kind === "icon" && cover && !author && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <img
+              src={cover}
+              alt=""
+              aria-hidden
+              className="h-10 w-10 opacity-70 mix-blend-luminosity grayscale"
+              style={{ imageRendering: "auto" }}
+            />
+          </div>
         )}
       </div>
       <div className="mt-2 line-clamp-2 font-display text-sm leading-snug text-ink">

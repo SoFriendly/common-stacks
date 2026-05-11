@@ -257,6 +257,20 @@ pub async fn list_downloads(state: State<'_, AppState>) -> CmdResult<Vec<Downloa
 }
 
 #[tauri::command]
+pub fn inspect_download(path: String) -> CmdResult<crate::epub::EpubMetadata> {
+    let p = std::path::PathBuf::from(&path);
+    let ext = p
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_ascii_lowercase())
+        .unwrap_or_default();
+    if ext != "epub" {
+        return Err("not an EPUB".into());
+    }
+    crate::epub::inspect_path(&p).map_err(err)
+}
+
+#[tauri::command]
 pub fn reveal_download(path: String) -> CmdResult<()> {
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     let p = std::path::PathBuf::from(&path);

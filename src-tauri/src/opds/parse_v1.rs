@@ -114,11 +114,19 @@ pub fn parse(bytes: &[u8], base_url: &str) -> Result<Feed> {
                                 }
                             }
                         }
-                        if ent.acquisitions.is_empty() && !ent.navigation.is_empty() {
-                            // navigation-only entry: treat as feed.navigation, but
-                            // preserve the entry title (and summary→title fallback)
-                            // since OPDS catalogs commonly express subsections as
-                            // <entry><title>Category</title><link rel="subsection" ...></entry>.
+                        // Decide whether this is a pure-navigation entry
+                        // (e.g. Mayberry's root: <entry><title>Genres</title>
+                        // <link rel="subsection".../></entry>) or a book entry
+                        // that happens to use a subsection link to its detail
+                        // page (Gutenberg pattern, with thumbnail + author in
+                        // <content>). Heuristic: if the entry has no cover,
+                        // no thumbnail, and no summary, treat it as nav.
+                        let is_pure_nav = ent.acquisitions.is_empty()
+                            && !ent.navigation.is_empty()
+                            && ent.cover.is_none()
+                            && ent.thumbnail.is_none()
+                            && ent.summary.is_none();
+                        if is_pure_nav {
                             let entry_title = if !ent.title.is_empty() {
                                 Some(ent.title.clone())
                             } else {

@@ -4,6 +4,7 @@ import { api, type Entry, type Link, type Source } from "../lib/api";
 import { CoverCard } from "../components/CoverCard";
 import { CategoryTile } from "../components/CategoryTile";
 import { Rail } from "../components/Rail";
+import { openEntry } from "../lib/entry";
 
 type RailContent =
   | { kind: "entries"; entries: Entry[] }
@@ -261,12 +262,10 @@ export function Library() {
                       authors={e.authors}
                       cover={e.cover ?? e.thumbnail}
                       onClick={() =>
-                        navigate("/book", {
-                          state: {
-                            sourceId: b.source.id,
-                            sourceName: b.source.name,
-                            entry: e,
-                          },
+                        openEntry(navigate, {
+                          sourceId: b.source.id,
+                          sourceName: b.source.name,
+                          entry: e,
                         })
                       }
                     />
