@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { api, type Entry, type Link, type Source } from "../lib/api";
+import { api, type Entry, type Link, type MergedBook, type SearchResult, type Source } from "../lib/api";
 import { CoverCard } from "../components/CoverCard";
 import { CategoryTile } from "../components/CategoryTile";
 import { Rail } from "../components/Rail";
 import { openEntry } from "../lib/entry";
+import { Search as SearchIcon, X, Download as DownloadIcon, Settings as SettingsIcon } from "lucide-react";
 
 type RailContent =
   | { kind: "entries"; entries: Entry[] }
@@ -54,7 +55,39 @@ function pickSubsections(navigation: Link[]): Link[] {
 
 export function Library() {
   const [blocks, setBlocks] = useState<SourceBlock[]>([]);
+  const [query, setQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
+  const searchSeq = useRef(0);
   const navigate = useNavigate();
+
+  async function runSearch(q: string) {
+    const trimmed = q.trim();
+    if (!trimmed) {
+      setSearchResult(null);
+      setSearching(false);
+      return;
+    }
+    const seq = ++searchSeq.current;
+    setSearching(true);
+    try {
+      const r = await api.search(trimmed);
+      if (seq !== searchSeq.current) return;
+      setSearchResult(r);
+    } catch (e) {
+      if (seq !== searchSeq.current) return;
+      setSearchResult({ merged: [], errors: [{ source_id: "", source_name: "", message: String(e) }] });
+    } finally {
+      if (seq === searchSeq.current) setSearching(false);
+    }
+  }
+
+  function clearSearch() {
+    searchSeq.current += 1;
+    setQuery("");
+    setSearchResult(null);
+    setSearching(false);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -194,20 +227,69 @@ export function Library() {
     navigate(`/browse?${params.toString()}`);
   }
 
+  const showingSearch = searchResult !== null || searching;
+
   return (
     <div className="px-10 pb-16">
-      <header className="mb-8">
-        <h1 className="font-display text-3xl tracking-tight text-ink">Library</h1>
-        <p className="mt-1 text-sm text-ink-soft">
-          Wander your stacks. Discovery across every connected library.
-        </p>
+      <header className="mb-8 flex items-end justify-between gap-6">
+        <div>
+          <h1 className="font-display text-3xl tracking-tight text-ink">Library</h1>
+          <p className="mt-1 text-sm text-ink-soft">
+            Wander your stacks. Discovery across every connected library.
+          </p>
+        </div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            runSearch(query);
+          }}
+          className="relative w-full max-w-md flex-1"
+        >
+          <SearchIcon className="pointer-events-none absolute top-1/2 left-0 h-4 w-4 -translate-y-1/2 text-ink-soft" />
+          <input
+            value={query}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              setQuery(v);
+              if (v.trim() === "") clearSearch();
+            }}
+            placeholder="Search titles, authors, ISBNs…"
+            className="w-full border-0 border-b border-shelf bg-transparent py-2 pr-9 pl-7 font-display text-base text-ink placeholder:text-ink-soft/70 focus:border-spine focus:outline-none focus:ring-0"
+          />
+          {(query || searchResult) && (
+            <button
+              type="button"
+              onClick={clearSearch}
+              aria-label="Clear search"
+              className="absolute top-1/2 right-1 flex h-6 w-6 -translate-y-1/2 items-center justify-center text-ink-soft hover:text-ink"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </form>
+        <div className="flex items-center gap-1">
+          <IconLink to="/downloads" label="Downloads">
+            <DownloadIcon className="h-4 w-4" />
+          </IconLink>
+          <IconLink to="/settings" label="Settings">
+            <SettingsIcon className="h-4 w-4" />
+          </IconLink>
+        </div>
       </header>
 
-      {blocks.length === 0 && (
-        <p className="text-sm text-ink-soft">No sources configured yet.</p>
-      )}
-
-      {blocks.map((b) => (
+      {showingSearch ? (
+        <SearchResultsView
+          query={query}
+          searching={searching}
+          result={searchResult}
+          onOpen={(book) => openMergedBook(navigate, book)}
+        />
+      ) : (
+        <>
+          {blocks.length === 0 && (
+            <p className="text-sm text-ink-soft">No sources configured yet.</p>
+          )}
+          {blocks.map((b) => (
         <section key={b.source.id} className="mb-12">
           <div className="mb-4 flex items-baseline gap-3 border-b border-shelf pb-2">
             <h2 className="font-display text-2xl tracking-tight">{b.source.name}</h2>
@@ -296,8 +378,115 @@ export function Library() {
           ))}
         </section>
       ))}
+        </>
+      )}
     </div>
   );
+}
+
+function IconLink({
+  to,
+  label,
+  children,
+}: {
+  to: string;
+  label: string;
+  children: React.ReactNode;
+}) {
+  const navigate = useNavigate();
+  return (
+    <button
+      onClick={() => navigate(to)}
+      aria-label={label}
+      title={label}
+      className="flex h-9 w-9 items-center justify-center rounded-md text-ink-soft transition-colors hover:bg-shelf hover:text-ink"
+    >
+      {children}
+    </button>
+  );
+}
+
+function SearchResultsView({
+  query,
+  searching,
+  result,
+  onOpen,
+}: {
+  query: string;
+  searching: boolean;
+  result: SearchResult | null;
+  onOpen: (book: MergedBook) => void;
+}) {
+  if (searching && !result) {
+    return <p className="text-sm text-ink-soft">Searching across libraries…</p>;
+  }
+  if (!result) return null;
+  return (
+    <>
+      <div className="mb-4 flex items-center gap-3 text-sm text-ink-soft">
+        <span>
+          {result.merged.length} {result.merged.length === 1 ? "result" : "results"} for
+          <span className="ml-1 font-display italic text-ink">"{query}"</span>
+        </span>
+      </div>
+      {result.merged.length === 0 ? (
+        <p className="text-sm text-ink-soft">No results.</p>
+      ) : (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-x-5 gap-y-8">
+          {result.merged.map((b) => (
+            <div key={b.key} className="flex flex-col">
+              <CoverCard
+                title={b.title}
+                authors={b.authors}
+                cover={b.cover ?? b.thumbnail}
+                onClick={() => onOpen(b)}
+              />
+              {b.sources.length > 1 && (
+                <div className="mt-1 px-1 text-[11px] text-ink-soft">
+                  from {b.sources.length} libraries
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {result.errors.length > 0 && (
+        <div className="mt-6 text-xs text-ink-soft">
+          {result.errors.map((e, i) => (
+            <div key={i}>
+              · {e.source_name || "(error)"}: {e.message}
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function openMergedBook(navigate: ReturnType<typeof useNavigate>, b: MergedBook) {
+  const primary = b.sources[0];
+  const entry: Entry = {
+    id: primary?.entry_id ?? b.key,
+    title: b.title,
+    authors: b.authors,
+    summary: b.summary,
+    identifiers: b.identifiers,
+    categories: b.categories,
+    series: b.series,
+    language: b.language,
+    cover: b.cover,
+    thumbnail: b.thumbnail,
+    acquisitions: b.acquisitions,
+    navigation: [],
+  };
+  navigate("/book", {
+    state: {
+      sourceId: primary?.source_id ?? "",
+      sourceName: primary?.source_name,
+      entry,
+      alternateSources: b.sources,
+    },
+  });
 }
 
 function railSubtitle(rail: RailData): string | undefined {

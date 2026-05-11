@@ -1,8 +1,20 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router";
 import { api, type DownloadedFile, type EpubMetadata } from "../lib/api";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { DefaultCover } from "../components/DefaultCover";
 import { MoreHorizontal } from "lucide-react";
+
+function BackLink() {
+  return (
+    <Link
+      to="/library"
+      className="mb-4 inline-block text-xs text-ink-soft hover:text-ink"
+    >
+      ← Library
+    </Link>
+  );
+}
 
 type View = "grid" | "list";
 
@@ -83,6 +95,7 @@ export function Downloads() {
 
   return (
     <div className="px-10 pb-16">
+      <BackLink />
       <header className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="font-display text-3xl tracking-tight">Downloads</h1>

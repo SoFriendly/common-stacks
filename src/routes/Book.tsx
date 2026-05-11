@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { api, type Acquisition, type Entry } from "../lib/api";
 import { DefaultCover } from "../components/DefaultCover";
-import { openPath } from "@tauri-apps/plugin-opener";
 
 /** State passed via navigation when clicking a cover. */
 export interface BookNavState {
@@ -161,12 +160,8 @@ export function Book() {
     }
   }
 
-  async function handleOpen(path: string) {
-    try {
-      await openPath(path);
-    } catch {
-      // ignore
-    }
+  function viewInDownloads() {
+    navigate("/downloads");
   }
 
   const cover = entry.cover ?? entry.thumbnail;
@@ -262,12 +257,10 @@ export function Book() {
                   <div key={a.href} className="flex items-center gap-2">
                     {done ? (
                       <button
-                        onClick={() =>
-                          downloadState.kind === "done" && handleOpen(downloadState.path)
-                        }
+                        onClick={viewInDownloads}
                         className="rounded-md bg-ink px-4 py-2 text-sm text-paper"
                       >
-                        Open {formatLabel(a)}
+                        View in Downloads
                       </button>
                     ) : (
                       <button

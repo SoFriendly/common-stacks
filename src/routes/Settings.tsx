@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router";
 import { api, type Source, type ValidateResult } from "../lib/api";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 
@@ -92,6 +93,12 @@ export function Settings() {
 
   return (
     <div className="px-10 pb-16">
+      <Link
+        to="/library"
+        className="mb-4 inline-block text-xs text-ink-soft hover:text-ink"
+      >
+        ← Library
+      </Link>
       <header className="mb-8">
         <h1 className="font-display text-3xl tracking-tight">Settings</h1>
       </header>
