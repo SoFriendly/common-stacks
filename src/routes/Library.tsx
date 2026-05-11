@@ -5,7 +5,13 @@ import { CoverCard } from "../components/CoverCard";
 import { CategoryTile } from "../components/CategoryTile";
 import { Rail } from "../components/Rail";
 import { openEntry } from "../lib/entry";
-import { Search as SearchIcon, X, Download as DownloadIcon, Settings as SettingsIcon } from "lucide-react";
+import {
+  Search as SearchIcon,
+  X,
+  Download as DownloadIcon,
+  Settings as SettingsIcon,
+  RefreshCw,
+} from "lucide-react";
 
 type RailContent =
   | { kind: "entries"; entries: Entry[] }
@@ -89,13 +95,19 @@ export function Library() {
     setSearching(false);
   }
 
-  useEffect(() => {
+  const loadSeq = useRef(0);
+  const [refreshing, setRefreshing] = useState(false);
+
+  function loadLibrary() {
+    const seq = ++loadSeq.current;
+    setRefreshing(true);
     let cancelled = false;
     (async () => {
       const sources = await api.listSources();
-      if (cancelled) return;
+      if (cancelled || seq !== loadSeq.current) return;
       setBlocks(sources.map((source) => ({ source, rails: [], loading: true })));
       await Promise.all(sources.map((s) => hydrate(s)));
+      if (seq === loadSeq.current) setRefreshing(false);
 
       async function hydrate(source: Source) {
         try {
@@ -220,6 +232,11 @@ export function Library() {
     return () => {
       cancelled = true;
     };
+  }
+
+  useEffect(() => {
+    loadLibrary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function browse(sourceId: string, href: string, title: string) {
@@ -271,6 +288,15 @@ export function Library() {
           <IconLink to="/downloads" label="Downloads">
             <DownloadIcon className="h-4 w-4" />
           </IconLink>
+          <button
+            onClick={loadLibrary}
+            disabled={refreshing}
+            aria-label="Refresh libraries"
+            title="Refresh"
+            className="flex h-9 w-9 items-center justify-center rounded-md text-ink-soft transition-colors hover:bg-shelf hover:text-ink disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          </button>
           <IconLink to="/settings" label="Settings">
             <SettingsIcon className="h-4 w-4" />
           </IconLink>

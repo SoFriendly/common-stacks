@@ -25,8 +25,8 @@ impl OpdsClient {
         );
         let http = reqwest::Client::builder()
             .default_headers(headers)
-            .timeout(Duration::from_secs(30))
-            .connect_timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(60))
+            .connect_timeout(Duration::from_secs(15))
             .build()
             .expect("reqwest client");
         Self { http }
