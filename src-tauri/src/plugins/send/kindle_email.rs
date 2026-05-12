@@ -134,11 +134,16 @@ impl SendTarget for KindleEmailTarget {
             )?;
 
         let creds = Credentials::new(user, pass);
-        let mailer: AsyncSmtpTransport<Tokio1Executor> =
+        // Port 465 uses implicit TLS; everything else (587, 25, custom) uses
+        // STARTTLS. Trying STARTTLS against 465 hangs because the server
+        // expects a TLS handshake immediately.
+        let builder = if port == 465 {
+            AsyncSmtpTransport::<Tokio1Executor>::relay(host)?
+        } else {
             AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(host)?
-                .port(port)
-                .credentials(creds)
-                .build();
+        };
+        let mailer: AsyncSmtpTransport<Tokio1Executor> =
+            builder.port(port).credentials(creds).build();
 
         match mailer.send(email).await {
             Ok(_) => Ok(SendResult {
