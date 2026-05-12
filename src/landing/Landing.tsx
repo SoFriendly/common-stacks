@@ -2,7 +2,7 @@ import { useState } from "react";
 import { CoverCard } from "../components/CoverCard";
 import { Rail } from "../components/Rail";
 import { DefaultCover } from "../components/DefaultCover";
-import { data, findEntry, type LandingEntry } from "./data";
+import { data, type LandingEntry } from "./data";
 import {
   Search as SearchIcon,
   Settings as SettingsIcon,

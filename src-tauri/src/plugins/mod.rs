@@ -1,4 +1,4 @@
-//! CommonStacks plugin SDK.
+//! Common Stacks plugin SDK.
 //!
 //! Two extension points are defined here as Rust traits. They're internally
 //! satisfied by built-in implementations for v1, but the trait surface is

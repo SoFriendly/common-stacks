@@ -13,7 +13,7 @@ impl OpenLibraryEnricher {
     pub fn new() -> Self {
         let http = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(20))
-            .user_agent("CommonStacks/0.1 (+https://github.com/jmitch)")
+            .user_agent("Common Stacks/0.1 (+https://github.com/jmitch)")
             .build()
             .expect("openlibrary client");
         Self { http }

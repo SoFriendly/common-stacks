@@ -1,0 +1,16 @@
+name = "commonstacks-landing"
+compatibility_date = "2026-01-01"
+
+# Static-only worker: Cloudflare serves files from dist-landing directly.
+# No worker code needed when [assets] is the whole site.
+[assets]
+directory = "../../dist-landing"
+not_found_handling = "single-page-application"
+
+[[routes]]
+pattern = "commonstacks.com/*"
+zone_name = "commonstacks.com"
+
+[[routes]]
+pattern = "www.commonstacks.com/*"
+zone_name = "commonstacks.com"

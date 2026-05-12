@@ -77,7 +77,7 @@ impl SendTarget for WebDavTarget {
 
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(120))
-            .user_agent("CommonStacks/0.1")
+            .user_agent("Common Stacks/0.1")
             .build()?;
         let mut req_b = client.put(&target).body(bytes);
         if !user.is_empty() {

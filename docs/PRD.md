@@ -1,8 +1,8 @@
-# CommonStacks PRD
+# Common Stacks PRD
 
 ## Overview
 
-CommonStacks is a local-first desktop application for browsing and downloading books from multiple OPDS libraries through a unified storefront-style interface.
+Common Stacks is a local-first desktop application for browsing and downloading books from multiple OPDS libraries through a unified storefront-style interface.
 
 The application is intentionally focused on:
 
@@ -11,7 +11,7 @@ The application is intentionally focused on:
 - downloading
 - lightweight library aggregation
 
-CommonStacks is not an ebook reader, ebook manager, metadata editor, or Calibre replacement.
+Common Stacks is not an ebook reader, ebook manager, metadata editor, or Calibre replacement.
 
 The experience should feel closer to:
 
@@ -29,7 +29,7 @@ than:
 
 ## Core Product Philosophy
 
-### What CommonStacks IS
+### What Common Stacks IS
 
 - A browser for OPDS libraries
 - A unified discovery interface for books
@@ -37,7 +37,7 @@ than:
 - A local-first desktop app
 - A storefront-style browsing experience
 
-### What CommonStacks IS NOT
+### What Common Stacks IS NOT
 
 The app must explicitly avoid becoming:
 
@@ -271,7 +271,7 @@ The app should never require full library syncing before search works.
 
 The app is cache-based, not sync-based.
 
-CommonStacks should:
+Common Stacks should:
 
 - fetch on demand
 - cache lightly
@@ -310,7 +310,7 @@ Downloads are core functionality.
 
 ### Default Location
 
-`~/Books/CommonStacks/`
+`~/Books/Common Stacks/`
 
 Users may configure a custom folder.
 

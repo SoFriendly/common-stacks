@@ -134,7 +134,7 @@ impl SendTarget for CrosspointTarget {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(600))
             .connect_timeout(std::time::Duration::from_secs(8))
-            .user_agent("CommonStacks/0.1")
+            .user_agent("Common Stacks/0.1")
             .build()?;
 
         // Probe /api/status first so we fail fast with a clear message if the

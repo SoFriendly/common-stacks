@@ -21,7 +21,7 @@ impl OpdsClient {
         headers.insert(ACCEPT, HeaderValue::from_static(OPDS_ACCEPT));
         headers.insert(
             USER_AGENT,
-            HeaderValue::from_static("CommonStacks/0.1 (+https://github.com/jmitch)"),
+            HeaderValue::from_static("Common Stacks/0.1 (+https://github.com/jmitch)"),
         );
         let http = reqwest::Client::builder()
             .default_headers(headers)
@@ -109,7 +109,7 @@ impl OpdsClient {
                 h.insert(
                     reqwest::header::USER_AGENT,
                     reqwest::header::HeaderValue::from_static(
-                        "CommonStacks/0.1 (+https://github.com/jmitch)",
+                        "Common Stacks/0.1 (+https://github.com/jmitch)",
                     ),
                 );
                 h

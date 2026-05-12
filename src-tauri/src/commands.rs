@@ -340,6 +340,30 @@ pub async fn export_config(state: State<'_, AppState>) -> CmdResult<String> {
     serde_json::to_string_pretty(&cfg).map_err(err)
 }
 
+#[tauri::command]
+pub async fn export_config_to_path(
+    state: State<'_, AppState>,
+    path: String,
+) -> CmdResult<()> {
+    let cfg: Config = state.config.read().await.clone();
+    let json = serde_json::to_string_pretty(&cfg).map_err(err)?;
+    std::fs::write(&path, json).map_err(err)
+}
+
+#[tauri::command]
+pub async fn import_config_from_path(
+    state: State<'_, AppState>,
+    path: String,
+) -> CmdResult<()> {
+    let json = std::fs::read_to_string(&path).map_err(err)?;
+    let incoming: Config = serde_json::from_str(&json).map_err(err)?;
+    {
+        let mut cfg = state.config.write().await;
+        *cfg = incoming;
+    }
+    state.save().await.map_err(err)
+}
+
 // ============================================================================
 // Plugin commands
 // ============================================================================

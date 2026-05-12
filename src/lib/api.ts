@@ -212,7 +212,9 @@ export const api = {
   setDownloadDir: (path: string) => invoke<void>("set_download_dir", { path }),
 
   exportConfig: () => invoke<string>("export_config"),
+  exportConfigToPath: (path: string) => invoke<void>("export_config_to_path", { path }),
   importConfig: (json: string) => invoke<void>("import_config", { json }),
+  importConfigFromPath: (path: string) => invoke<void>("import_config_from_path", { path }),
 
   listPlugins: () => invoke<InstalledPlugin[]>("list_plugins"),
   pluginsDir: () => invoke<string>("plugins_dir"),

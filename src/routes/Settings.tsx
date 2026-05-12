@@ -105,17 +105,12 @@ export function Settings() {
       defaultPath: "common-stacks.json",
       filters: [{ name: "JSON", extensions: ["json"] }],
     });
-    if (!path) return;
-    const json = await api.exportConfig();
-    // Use simple browser File save via a blob if available; fall back to writing via JS clipboard if not.
-    // Tauri fs plugin removed for minimal scope — instead embed config in a textarea export.
-    const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = (path as string).split(/[/\\]/).pop() || "common-stacks.json";
-    a.click();
-    URL.revokeObjectURL(url);
+    if (typeof path !== "string") return;
+    try {
+      await api.exportConfigToPath(path);
+    } catch (e) {
+      window.alert(`Export failed: ${e}`);
+    }
   }
 
   async function handleImport() {
@@ -124,10 +119,12 @@ export function Settings() {
       filters: [{ name: "JSON", extensions: ["json"] }],
     });
     if (typeof sel !== "string") return;
-    const resp = await fetch(`file://${sel}`);
-    const json = await resp.text();
-    await api.importConfig(json);
-    refresh();
+    try {
+      await api.importConfigFromPath(sel);
+      refresh();
+    } catch (e) {
+      window.alert(`Import failed: ${e}`);
+    }
   }
 
   return (

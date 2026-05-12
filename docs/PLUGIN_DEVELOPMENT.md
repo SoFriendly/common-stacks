@@ -1,6 +1,6 @@
-# CommonStacks Plugin Development Guide
+# Common Stacks Plugin Development Guide
 
-CommonStacks is extensible. Built-in plugins ship with the app; user plugins
+Common Stacks is extensible. Built-in plugins ship with the app; user plugins
 are **regular executables or scripts** dropped into a per-user plugins
 directory and discovered at startup.
 
@@ -25,7 +25,7 @@ You can implement any subset; declare which in your `manifest.json`.
 
 ## Anatomy of a plugin
 
-A plugin is a folder placed inside the CommonStacks plugins directory:
+A plugin is a folder placed inside the Common Stacks plugins directory:
 
 ```
 <plugins-dir>/
@@ -34,7 +34,7 @@ A plugin is a folder placed inside the CommonStacks plugins directory:
     └── plugin.py        (or plugin, plugin.exe, plugin.js, …)
 ```
 
-CommonStacks discovers each subfolder, reads its `manifest.json`, runs the
+Common Stacks discovers each subfolder, reads its `manifest.json`, runs the
 named executable for every call, and registers the plugin with the
 appropriate registry.
 
@@ -42,9 +42,9 @@ appropriate registry.
 
 | Platform | Path |
 | --- | --- |
-| macOS | `~/Library/Application Support/CommonStacks/plugins/` |
-| Linux | `~/.config/CommonStacks/plugins/` |
-| Windows | `%APPDATA%\CommonStacks\plugins\` |
+| macOS | `~/Library/Application Support/Common Stacks/plugins/` |
+| Linux | `~/.config/Common Stacks/plugins/` |
+| Windows | `%APPDATA%\Common Stacks\plugins\` |
 
 Open it from inside the app via **Settings → Plugins → Open plugins folder**.
 
@@ -80,7 +80,7 @@ Open it from inside the app via **Settings → Plugins → Open plugins folder**
 
 ## The v1 subprocess protocol
 
-For every operation, CommonStacks invokes:
+For every operation, Common Stacks invokes:
 
 ```bash
 ./<executable> <command> [args...]
@@ -102,12 +102,12 @@ Exit codes:
 - **All JSON is UTF-8.**
 - **Each command is a fresh process.** You can't keep in-process state. If
   you need to cache, write to a file inside your plugin folder (or anywhere
-  on disk) and re-read it on each call. CommonStacks may invoke your plugin
+  on disk) and re-read it on each call. Common Stacks may invoke your plugin
   many times in quick succession — keep startup fast.
 - **The host can run multiple plugin invocations in parallel.** If your
   caching writes to disk, guard against concurrent writes.
 - **Stderr is for diagnostics.** Anything you write to stderr will be shown
-  in the CommonStacks log; on errors it's surfaced in the UI.
+  in the Common Stacks log; on errors it's surfaced in the UI.
 
 ### Commands
 
@@ -150,7 +150,7 @@ Exit codes:
 // SendRequest (part of the input)
 {
   "target_id": "my-plugin",
-  "file_path": "/Users/me/Books/CommonStacks/Foo.epub",
+  "file_path": "/Users/me/Books/Common Stacks/Foo.epub",
   "title":     "Foo",
   "author":    "Jane Doe"
 }
@@ -186,7 +186,7 @@ If your plugin declares the `send` or `transformer` capability, the host
 queries these on load:
 
 - **stdin**: empty.
-- **stdout**: JSON array of `SettingField` describing the form CommonStacks
+- **stdout**: JSON array of `SettingField` describing the form Common Stacks
   should render in Settings.
 
 ```jsonc
@@ -216,14 +216,14 @@ strings `"true"` / `"false"`.
 
 ### Settings storage
 
-User-entered settings are persisted by CommonStacks in `config.json` under
+User-entered settings are persisted by Common Stacks in `config.json` under
 the plugin's id. Your plugin receives them as the `settings` field of the
 relevant `send` / `transform` invocation; you never write to the file
 yourself.
 
 ### Merge policy *(metadata enrichers)*
 
-CommonStacks merges enriched data on top of the OPDS source data with **OPDS
+Common Stacks merges enriched data on top of the OPDS source data with **OPDS
 fields winning**. A plugin only fills in gaps — it can't overwrite a cover
 or summary the source already provided.
 
@@ -271,7 +271,7 @@ sys.exit(main())
 ```
 
 That's the whole plugin. `chmod +x plugin.py`, drop the folder into your
-plugins directory, restart CommonStacks.
+plugins directory, restart Common Stacks.
 
 ---
 
@@ -383,7 +383,7 @@ optimization (seconds). If you need to pre-warm an expensive thing (a model,
 a remote API session), keep a cache file inside your plugin folder and load
 it lazily on each call.
 
-For truly latency-critical paths, future versions of CommonStacks may add a
+For truly latency-critical paths, future versions of Common Stacks may add a
 long-running server protocol (one process, many calls over a socket). v1
 keeps it spawn-per-call for simplicity.
 
@@ -391,7 +391,7 @@ keeps it spawn-per-call for simplicity.
 
 ## Debugging
 
-Plugin load errors are logged to the CommonStacks log:
+Plugin load errors are logged to the Common Stacks log:
 
 ```bash
 RUST_LOG=common_stacks_lib=info bun run tauri dev
@@ -406,9 +406,9 @@ skipping plugin /…/my-plugin: incompatible plugin API version 2 (host supports
 
 Per-call stderr from a plugin is forwarded into the error path. If your
 plugin exits non-zero, anything you wrote to stderr becomes the error
-message shown in the CommonStacks UI — use that to surface diagnostics.
+message shown in the Common Stacks UI — use that to surface diagnostics.
 
-Test your plugin outside CommonStacks by piping JSON yourself:
+Test your plugin outside Common Stacks by piping JSON yourself:
 
 ```bash
 echo '{"title": "Dune"}' | ./plugin.py enrich
