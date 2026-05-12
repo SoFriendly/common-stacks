@@ -203,7 +203,8 @@ impl PluginRegistry {
     fn register_builtins(&mut self) {
         let openlibrary = Arc::new(metadata::openlibrary::OpenLibraryEnricher::new());
         let crosspoint = Arc::new(send::crosspoint::CrosspointTarget);
-        let kindle = Arc::new(send::kindle_email::KindleEmailTarget);
+        let kindle_cf = Arc::new(send::kindle_cloudflare::KindleCloudflareTarget);
+        let kindle_smtp = Arc::new(send::kindle_email::KindleEmailTarget);
         let webdav = Arc::new(send::webdav::WebDavTarget);
         let optimizer = Arc::new(transform::epub_optimizer::EpubOptimizer);
 
@@ -212,7 +213,9 @@ impl PluginRegistry {
         self.sources
             .insert(crosspoint.descriptor().id, PluginSource::Builtin);
         self.sources
-            .insert(kindle.descriptor().id, PluginSource::Builtin);
+            .insert(kindle_cf.descriptor().id, PluginSource::Builtin);
+        self.sources
+            .insert(kindle_smtp.descriptor().id, PluginSource::Builtin);
         self.sources
             .insert(webdav.descriptor().id, PluginSource::Builtin);
         self.sources
@@ -220,7 +223,8 @@ impl PluginRegistry {
 
         self.enrichers.push(openlibrary);
         self.send_targets.push(crosspoint);
-        self.send_targets.push(kindle);
+        self.send_targets.push(kindle_cf);
+        self.send_targets.push(kindle_smtp);
         self.send_targets.push(webdav);
         self.transformers.push(optimizer);
     }

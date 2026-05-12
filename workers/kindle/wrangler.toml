@@ -1,0 +1,14 @@
+name = "commonstacks-kindle"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+
+[[routes]]
+pattern = "kindle.commonstacks.com/*"
+zone_name = "commonstacks.com"
+
+# Secrets set via `wrangler secret put`:
+#   CF_API_TOKEN     — API token with Email Service: Send permission for this account.
+#   CF_ACCOUNT_ID    — Cloudflare account id.
+#   SENDER_EMAIL     — Sender address (must be in the configured sending domain), e.g. cs@kindle.commonstacks.com
+#   SENDER_NAME      — Optional display name shown in the From line.
+#   SHARED_SECRET    — Optional. If set, callers must send `X-CS-Token: <value>` matching this.

@@ -15,10 +15,10 @@ impl SendTarget for KindleEmailTarget {
     fn descriptor(&self) -> PluginDescriptor {
         PluginDescriptor {
             id: "kindle-email".into(),
-            name: "Send to Kindle (email)".into(),
+            name: "Send to Kindle (SMTP)".into(),
             description:
-                "Email a book file to your Kindle's @kindle.com address via SMTP. \
-                 Add your sending address to Amazon's approved senders list."
+                "Advanced: email a book to your Kindle via your own SMTP server. \
+                 Useful if you'd rather not use the Common Stacks relay."
                     .into(),
         }
     }
