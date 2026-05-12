@@ -10,7 +10,7 @@ name = "common_stacks_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [[bin]]
-name = "CommonStacks"
+name = "common-stacks"
 path = "src/main.rs"
 
 [build-dependencies]

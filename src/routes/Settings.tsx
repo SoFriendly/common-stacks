@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import {
   api,
@@ -128,19 +128,21 @@ export function Settings() {
   }
 
   return (
-    <div className="px-6 pb-16">
+    <div className="mx-auto max-w-5xl px-6 pb-16">
       <Link
         to="/library"
         className="mb-4 inline-block text-xs text-ink-soft hover:text-ink"
       >
         ← Library
       </Link>
-      <header className="mb-8">
+      <header className="mb-10">
         <h1 className="font-display text-3xl tracking-tight">Settings</h1>
       </header>
 
-      <section className="mb-12">
-        <h2 className="mb-3 font-display text-xl">Libraries</h2>
+      <SettingsRow
+        title="Libraries"
+        description="OPDS feeds Common Stacks reads from. Toggle to disable without removing."
+      >
         <div className="overflow-hidden rounded-lg border border-shelf">
           {sources.length === 0 && (
             <div className="p-4 text-sm text-ink-soft">No libraries.</div>
@@ -155,10 +157,12 @@ export function Settings() {
             />
           ))}
         </div>
-      </section>
+      </SettingsRow>
 
-      <section className="mb-12 max-w-2xl">
-        <h2 className="mb-3 font-display text-xl">Add a library</h2>
+      <SettingsRow
+        title="Add a library"
+        description="Point at any OPDS 1 or 2 feed. Validate first to confirm reachability and auth."
+      >
         <div className="grid gap-3">
           <input
             value={newName}
@@ -248,10 +252,12 @@ export function Settings() {
             )}
           </div>
         </div>
-      </section>
+      </SettingsRow>
 
-      <section className="mb-12 max-w-2xl">
-        <h2 className="mb-3 font-display text-xl">Download folder</h2>
+      <SettingsRow
+        title="Download folder"
+        description="Where downloaded books are saved on this machine."
+      >
         <div className="flex items-center gap-3">
           <code className="flex-1 rounded-md border border-shelf bg-white px-3 py-2 text-xs">
             {downloadDir}
@@ -263,23 +269,26 @@ export function Settings() {
             Change…
           </button>
         </div>
-      </section>
+      </SettingsRow>
 
-      <section className="mb-12 max-w-2xl">
-        <h2 className="mb-3 font-display text-xl">Send-to targets</h2>
-        <p className="mb-3 text-xs text-ink-soft">
-          Configure where downloaded books can be delivered (Kindle, WebDAV).
-        </p>
+      <SettingsRow
+        title="Send-to targets"
+        description="Configure where downloaded books can be delivered (Kindle, WebDAV)."
+      >
         <SendTargetsPanel />
-      </section>
+      </SettingsRow>
 
-      <section className="mb-12 max-w-2xl">
-        <h2 className="mb-3 font-display text-xl">App updates</h2>
+      <SettingsRow
+        title="App updates"
+        description="Common Stacks auto-checks for updates on launch."
+      >
         <UpdatePanel />
-      </section>
+      </SettingsRow>
 
-      <section className="mb-12 max-w-2xl">
-        <h2 className="mb-3 font-display text-xl">Import / Export</h2>
+      <SettingsRow
+        title="Import / Export"
+        description="Move your libraries and settings to another machine."
+      >
         <div className="flex gap-2">
           <button
             onClick={handleExport}
@@ -294,16 +303,37 @@ export function Settings() {
             Import…
           </button>
         </div>
-      </section>
+      </SettingsRow>
 
-      <section className="max-w-2xl">
-        <h2 className="mb-3 font-display text-xl">Plugins</h2>
-        <p className="mb-3 text-xs text-ink-soft">
-          Plugins extend Common Stacks with new metadata sources, send-to targets, and EPUB transformers.
-        </p>
+      <SettingsRow
+        title="Plugins"
+        description="Plugins extend Common Stacks with new metadata sources, send-to targets, and EPUB transformers."
+      >
         <PluginsPanel />
-      </section>
+      </SettingsRow>
     </div>
+  );
+}
+
+function SettingsRow({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="grid grid-cols-1 gap-6 border-t border-shelf py-8 md:grid-cols-[14rem_1fr] md:gap-10">
+      <div>
+        <h2 className="font-display text-lg">{title}</h2>
+        {description && (
+          <p className="mt-1 text-xs leading-relaxed text-ink-soft">{description}</p>
+        )}
+      </div>
+      <div className="max-w-2xl">{children}</div>
+    </section>
   );
 }
 
