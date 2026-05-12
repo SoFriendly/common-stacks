@@ -16,6 +16,19 @@ function Logo({ className }: { className?: string }) {
   return <img src="/logo.png" alt="Common Stacks" className={className} />;
 }
 
+function GithubMark({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden
+      className={className}
+    >
+      <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2.02c-3.2.7-3.87-1.36-3.87-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.71 1.26 3.37.97.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.51-1.47.11-3.06 0 0 .97-.31 3.18 1.18a11 11 0 015.79 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.59.23 2.77.11 3.06.74.81 1.18 1.84 1.18 3.1 0 4.42-2.69 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.68.8.56A11.51 11.51 0 0023.5 12C23.5 5.65 18.35.5 12 .5z" />
+    </svg>
+  );
+}
+
 type View = "library" | "book";
 type SelectedBook = { entry: LandingEntry; railTitle: string };
 
@@ -46,6 +59,7 @@ export function Landing() {
         )}
       </PreviewWindow>
       <Features />
+      <Plugins />
       <Sources />
       <Footer />
     </div>
@@ -60,19 +74,6 @@ function SiteHeader() {
           <Logo className="h-5 w-5" />
           Common Stacks
         </a>
-        <nav className="hidden items-center gap-7 text-sm text-ink-soft md:flex">
-          <a href="#preview" className="hover:text-ink">Preview</a>
-          <a href="#features" className="hover:text-ink">Features</a>
-          <a href="#sources" className="hover:text-ink">Sources</a>
-          <a
-            href="https://github.com/jmitch/common-stacks"
-            className="hover:text-ink"
-            target="_blank"
-            rel="noreferrer"
-          >
-            GitHub
-          </a>
-        </nav>
         <a
           href="#download"
           className="rounded-md bg-ink px-3.5 py-1.5 text-sm text-paper transition-opacity hover:opacity-90"
@@ -124,11 +125,12 @@ function Hero() {
               rel="noreferrer"
               className="inline-flex items-center gap-2 rounded-md border border-shelf bg-paper px-5 py-2.5 text-sm text-ink transition-colors hover:bg-shelf"
             >
+              <GithubMark className="h-4 w-4" />
               Source on GitHub
             </a>
           </div>
           <p className="mt-3 text-xs text-ink-soft">
-            Free. Open source. macOS.
+            Free, open source, local. No server, no accounts, no telemetry.
           </p>
         </div>
       </div>
@@ -365,9 +367,6 @@ function Features() {
           <h2 className="font-display text-3xl tracking-tight md:text-4xl">
             Not a reader. A way to your reader.
           </h2>
-          <p className="mt-3 text-ink-soft">
-            No accounts. No telemetry. No lock-in.
-          </p>
         </div>
         <div className="mt-12 grid gap-6 md:grid-cols-2">
           {items.map((f) => (
@@ -382,6 +381,80 @@ function Features() {
               <p className="mt-2 text-sm leading-relaxed text-ink-soft">{f.body}</p>
             </div>
           ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Plugins() {
+  const categories = [
+    {
+      label: "Metadata",
+      blurb: "Fill in covers, descriptions, ISBNs, subjects.",
+      builtins: ["OpenLibrary"],
+    },
+    {
+      label: "Send",
+      blurb: "Deliver the file to a device or service.",
+      builtins: ["Kindle Email", "Crosspoint", "WebDAV"],
+    },
+    {
+      label: "Transform",
+      blurb: "Rewrite the file on its way out. Shrink images, fix metadata.",
+      builtins: ["EPUB Image Optimizer"],
+    },
+  ];
+  return (
+    <section id="plugins" className="border-t border-shelf py-20">
+      <div className="mx-auto max-w-6xl px-6">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="font-display text-3xl tracking-tight md:text-4xl">
+            Extend it without forking it.
+          </h2>
+          <p className="mt-3 text-ink-soft">
+            Plugins are native libraries you drop into a folder. The app loads them at
+            startup and they show up next to the built-ins.
+          </p>
+        </div>
+
+        <div className="mt-12 grid gap-6 md:grid-cols-3">
+          {categories.map((c) => (
+            <div key={c.label} className="rounded-lg border border-shelf bg-paper p-6">
+              <div className="font-display text-xs uppercase tracking-[0.18em] text-accent">
+                {c.label}
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-ink">{c.blurb}</p>
+              <div className="mt-4 flex flex-wrap gap-1.5">
+                {c.builtins.map((b) => (
+                  <span
+                    key={b}
+                    className="rounded-full bg-shelf px-2.5 py-0.5 text-xs text-ink-soft"
+                  >
+                    {b}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-10 grid gap-4 rounded-lg border border-shelf bg-shelf/30 p-6 md:grid-cols-[1fr_auto] md:items-center">
+          <div>
+            <h3 className="font-display text-lg tracking-tight">Build your own.</h3>
+            <p className="mt-1 text-sm text-ink-soft">
+              Small, stable C ABI. JSON in, JSON out. Write it in any language that
+              produces a dynamic library. No Rust required.
+            </p>
+          </div>
+          <a
+            href="https://github.com/jmitch/common-stacks/blob/main/docs/PLUGIN_DEVELOPMENT.md"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center justify-center gap-2 rounded-md border border-shelf bg-paper px-4 py-2 text-sm text-ink transition-colors hover:bg-shelf"
+          >
+            Plugin development guide
+          </a>
         </div>
       </div>
     </section>
