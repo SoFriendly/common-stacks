@@ -9,7 +9,10 @@ use feed::Feed;
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, USER_AGENT};
 use std::time::Duration;
 
-const OPDS_ACCEPT: &str = "application/opds+json, application/atom+xml;profile=opds-catalog, application/atom+xml, application/xml;q=0.8, */*;q=0.5";
+// Prefer Atom over JSON via q-weights. Both are widely supported; well-
+// behaved servers respect the ranking and return Atom when given the
+// choice. JSON is accepted as a fallback for catalogs that only serve it.
+const OPDS_ACCEPT: &str = "application/atom+xml;profile=opds-catalog, application/atom+xml, application/opds+json;q=0.8, application/xml;q=0.6, */*;q=0.5";
 
 pub struct OpdsClient {
     http: reqwest::Client,
