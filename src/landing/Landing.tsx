@@ -413,8 +413,8 @@ function Plugins() {
             Extend it without forking it.
           </h2>
           <p className="mt-3 text-ink-soft">
-            Plugins are native libraries you drop into a folder. The app loads them at
-            startup and they show up next to the built-ins.
+            Plugins are scripts or executables you drop into a folder. The app discovers
+            them at startup and they show up next to the built-ins.
           </p>
         </div>
 
@@ -443,8 +443,8 @@ function Plugins() {
           <div>
             <h3 className="font-display text-lg tracking-tight">Build your own.</h3>
             <p className="mt-1 text-sm text-ink-soft">
-              Small, stable C ABI. JSON in, JSON out. Write it in any language that
-              produces a dynamic library. No Rust required.
+              Read JSON on stdin, write JSON on stdout. Python, Node, Go, Bash, anything
+              with a shebang. No FFI, no ABI, no Rust required.
             </p>
           </div>
           <a
