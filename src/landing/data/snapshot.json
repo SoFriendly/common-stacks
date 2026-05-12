@@ -1,0 +1,556 @@
+{
+  "capturedAt": "2026-05-12T06:03:17.272Z",
+  "sourceName": "Mayberry Library",
+  "sourceUrl": "https://mayberry.pub",
+  "rails": [
+    {
+      "key": "new",
+      "title": "New Arrivals",
+      "href": "/opds/new",
+      "entries": [
+        {
+          "id": "urn:isbn:MBd5b4ffc66d6b",
+          "isbn": "MBd5b4ffc66d6b",
+          "title": "Dead Moon",
+          "authors": [
+            "Clines, Peter"
+          ],
+          "categories": [
+            "Zombies"
+          ],
+          "cover": "/landing-covers/MBd5b4ffc66d6b.jpg"
+        },
+        {
+          "id": "urn:isbn:MBc9e004eb0610",
+          "isbn": "MBc9e004eb0610",
+          "title": "Terminus",
+          "authors": [
+            "Peter Clines"
+          ],
+          "categories": [],
+          "cover": "/landing-covers/MBc9e004eb0610.jpg"
+        },
+        {
+          "id": "urn:isbn:9780399178610",
+          "isbn": "9780399178610",
+          "title": "Hyperion",
+          "authors": [
+            "Dan Simmons"
+          ],
+          "summary": "A stunning tour de force filled with transcendent awe and wonder, Hyperion is a masterwork of science fiction that resonates with excitement and invention, the first volume in a remarkable epic by the multiple-award-winning author of The ...",
+          "categories": [
+            "Science Fiction",
+            "Fantasy",
+            "Classics",
+            "Action & Adventure",
+            "Contemporary Fiction",
+            "Children's Fiction",
+            "Space Opera"
+          ],
+          "cover": "/landing-covers/9780399178610.jpg"
+        },
+        {
+          "id": "urn:isbn:9780765327253",
+          "isbn": "9780765327253",
+          "title": "One Second After",
+          "authors": [
+            "William R. Forstchen"
+          ],
+          "summary": "It is a weapon that the Wall Street Journal warns could shatter America. In the tradition of On the Beach, Fail Safe and Testament, this book, set in a typical American town, is a dire warning of what might be our future...and our end.",
+          "categories": [
+            "Science Fiction",
+            "Fiction",
+            "Suspense",
+            "Thrillers",
+            "Mystery and Suspense Fiction",
+            "Fiction - Espionage",
+            "Thriller"
+          ],
+          "cover": "/landing-covers/9780765327253.jpg"
+        },
+        {
+          "id": "urn:isbn:MB5e20a20fa2f4",
+          "isbn": "MB5e20a20fa2f4",
+          "title": "Authority: A Novel (Southern Reach Book 2)",
+          "authors": [
+            "VanderMeer, Jeff"
+          ],
+          "categories": [],
+          "cover": "/landing-covers/MB5e20a20fa2f4.jpg"
+        },
+        {
+          "id": "urn:isbn:9780399563867",
+          "isbn": "9780399563867",
+          "title": "The Hike",
+          "authors": [
+            "Drew Magary"
+          ],
+          "categories": [],
+          "cover": "/landing-covers/9780399563867.jpg"
+        },
+        {
+          "id": "urn:isbn:9781783751754",
+          "isbn": "9781783751754",
+          "title": "A Symphony of Echoes",
+          "authors": [
+            "Jodi Taylor"
+          ],
+          "categories": [],
+          "cover": "/landing-covers/9781783751754.jpg"
+        },
+        {
+          "id": "urn:isbn:MBb862a2e8565a",
+          "isbn": "MBb862a2e8565a",
+          "title": "He Who Fights with Monsters: A LitRPG Adventure",
+          "authors": [
+            "Shirtaloon"
+          ],
+          "categories": [],
+          "cover": "/landing-covers/MBb862a2e8565a.jpg"
+        },
+        {
+          "id": "urn:isbn:MB3e959a7d1334",
+          "isbn": "MB3e959a7d1334",
+          "title": "Dragon Teeth",
+          "authors": [
+            "Crichton, Michael"
+          ],
+          "categories": [],
+          "cover": "/landing-covers/MB3e959a7d1334.jpg"
+        },
+        {
+          "id": "urn:isbn:9780345539786",
+          "isbn": "9780345539786",
+          "title": "Red Rising",
+          "authors": [
+            "Pierce Brown"
+          ],
+          "summary": "NEW YORK TIMES BESTSELLER • Pierce Brown’s relentlessly entertaining debut channels the excitement of The Hunger Games by Suzanne Collins and Ender’s Game by Orson Scott Card. “Red Rising ascends above a crowded dys­topian field ...",
+          "categories": [
+            "Fiction"
+          ],
+          "cover": "/landing-covers/9780345539786.jpg"
+        },
+        {
+          "id": "urn:isbn:9780307829443",
+          "isbn": "9780307829443",
+          "title": "The Trial: A New Translation Based on the Restored Text",
+          "authors": [
+            "Franz Kafka"
+          ],
+          "categories": [
+            "Classics",
+            "Philosophy"
+          ],
+          "cover": "/landing-covers/9780307829443.jpg"
+        },
+        {
+          "id": "urn:isbn:9780593358795",
+          "isbn": "9780593358795",
+          "title": "Dark Force Rising",
+          "authors": [
+            "Timothy Zahn"
+          ],
+          "summary": "In this essential Star Wars Legends novel, the sequel to Heir to the Empire, Grand Admiral Thrawn’s sinister plan threatens to spell doom for the fledgling New Republic and its most iconic heroes.",
+          "categories": [
+            "Science Fiction",
+            "Fantasy",
+            "Action & Adventure",
+            "Young Adult",
+            "Contemporary Fiction",
+            "Space Opera"
+          ],
+          "cover": "/landing-covers/9780593358795.jpg"
+        },
+        {
+          "id": "urn:isbn:9780735217904",
+          "isbn": "9780735217904",
+          "title": "The War of the Givens",
+          "authors": [
+            "Daniel Price"
+          ],
+          "categories": [],
+          "cover": "/landing-covers/9780735217904.jpg"
+        },
+        {
+          "id": "urn:isbn:9781509866694",
+          "isbn": "9781509866694",
+          "title": "Recursion",
+          "authors": [
+            "Blake Crouch"
+          ],
+          "summary": "'An unbelievably good read' 'Mind-blowing, brilliant, enthralling and gripping from beginning to end' 'The stakes are colossal, the characters are the perfect propelling forces of the story, and the big reveals are placed at exactly the ...",
+          "categories": [
+            "Science Fiction",
+            "Fantasy",
+            "Dystopian",
+            "Romance",
+            "Contemporary Fiction",
+            "Suspense",
+            "Thriller",
+            "Classics",
+            "Action & Adventure",
+            "Mystery",
+            "Psychological Thriller"
+          ],
+          "cover": "/landing-covers/9781509866694.jpg"
+        },
+        {
+          "id": "urn:isbn:9781542092067",
+          "isbn": "9781542092067",
+          "title": "Ark",
+          "authors": [
+            "Veronica Roth"
+          ],
+          "summary": "On the eve of Earth’s destruction, a young scientist discovers something too precious to lose, in a story of cataclysm and hope by the #1 <i>New York Times</i> bestselling author of the Divergent trilogy.<br /><br />It’s only two weeks before an asteroid turns home to dust. Though most of Earth has already been evacuated, it’s Samantha’s job to catalog plant samples for the survivors’ unknowable journey beyond.<br /><br />Preparing to stay behind and watch the world end, she makes a final human connection.<br /><br />As certain doom hurtles nearer, the unexpected and beautiful potential for the future begins to flower.<br /><br /><i>Veronica Roth’s</i> Ark <i>is part of</i> Forward<i>, a collection of six stories of the near and far future from out-of-this-world authors. Each piece can be read or listened to in a single thought-provoking sitting.</i>",
+          "categories": [],
+          "cover": "/landing-covers/9781542092067.jpg"
+        },
+        {
+          "id": "urn:isbn:9780553804676",
+          "isbn": "9780553804676",
+          "title": "The Lies of Locke Lamora",
+          "authors": [
+            "Scott Lynch"
+          ],
+          "summary": "Debut author Lynch pens a witty and fast-paced narrative that is nearly as much of a con as the wily schemes of its hero.",
+          "categories": [
+            "Fantasy",
+            "Action & Adventure",
+            "Young Adult",
+            "Science Fiction",
+            "Contemporary Fiction",
+            "Epic Fantasy",
+            "Mystery",
+            "Crime"
+          ],
+          "cover": "/landing-covers/9780553804676.jpg"
+        },
+        {
+          "id": "urn:isbn:9780345457707",
+          "isbn": "9780345457707",
+          "title": "Altered Carbon",
+          "authors": [
+            "Richard K. Morgan"
+          ],
+          "summary": "NEW YORK TIMES BESTSELLER • NOW AN EXCITING SERIES FROM NETFLIX • The shell that blew a hole in his chest was only the beginning in this “tour de force of genre-bending, a brilliantly realized exercise in science fiction.”—The New ...",
+          "categories": [
+            "Science Fiction",
+            "Fantasy",
+            "Dystopian",
+            "Action & Adventure",
+            "Contemporary Fiction",
+            "Mystery",
+            "Crime",
+            "Thriller",
+            "Cyberpunk",
+            "Noir"
+          ],
+          "cover": "/landing-covers/9780345457707.jpg"
+        },
+        {
+          "id": "urn:isbn:MB2b9a3012184e",
+          "isbn": "MB2b9a3012184e",
+          "title": "Acceptance: A Novel (Southern Reach Book 3)",
+          "authors": [
+            "VanderMeer, Jeff"
+          ],
+          "categories": [],
+          "cover": "/landing-covers/MB2b9a3012184e.jpg"
+        }
+      ]
+    },
+    {
+      "key": "popular",
+      "title": "Top Reads",
+      "href": "/opds/popular",
+      "entries": [
+        {
+          "id": "urn:isbn:9780593820315",
+          "isbn": "9780593820315",
+          "title": "Operation Bounce House",
+          "authors": [
+            "Matt Dinniman"
+          ],
+          "categories": [],
+          "cover": "/landing-covers/9780593820315.jpg"
+        },
+        {
+          "id": "urn:isbn:9798874866297",
+          "isbn": "9798874866297",
+          "title": "God’s Junk Drawer",
+          "authors": [
+            "Peter Clines"
+          ],
+          "categories": [],
+          "cover": "/landing-covers/9798874866297.jpg"
+        },
+        {
+          "id": "urn:isbn:9781618680525",
+          "isbn": "9781618680525",
+          "title": "14",
+          "authors": [
+            "Peter Clines"
+          ],
+          "categories": [
+            "Fiction",
+            "Thrillers",
+            "Science Fiction",
+            "Mystery",
+            "Adventure",
+            "Action & Adventure",
+            "Apocalypse"
+          ],
+          "cover": "/landing-covers/9781618680525.jpg"
+        },
+        {
+          "id": "urn:isbn:9781783751754",
+          "isbn": "9781783751754",
+          "title": "A Symphony of Echoes",
+          "authors": [
+            "Jodi Taylor"
+          ],
+          "categories": [],
+          "cover": "/landing-covers/9781783751754.jpg"
+        },
+        {
+          "id": "urn:isbn:MB38280534e3fb",
+          "isbn": "MB38280534e3fb",
+          "title": "Dungeon Crawler Carl",
+          "authors": [
+            "Matt Dinniman"
+          ],
+          "categories": [
+            "Litrpg",
+            "Apocalyptic",
+            "Humor"
+          ],
+          "cover": "/landing-covers/MB38280534e3fb.jpg"
+        },
+        {
+          "id": "urn:isbn:9781542044257",
+          "isbn": "9781542044257",
+          "title": "Randomize",
+          "authors": [
+            "Andy Weir"
+          ],
+          "summary": "In the near future, if Vegas games are ingeniously scam-proof, then the heists have to be too, in this imaginative and whip-smart story by the <i>New York Times</i> bestselling author of <i>The Martian</i>.<br /><br />An IT whiz at the Babylon Casino is enlisted to upgrade security for the game of keno and its random-number generator. The new quantum computer system is foolproof. But someone on the inside is no fool. For once the odds may not favor the house—unless human ingenuity isn’t <i>entirely</i> a thing of the past.<br /><br /><i>Andy Weir’s</i> Randomize <i>is part of</i> Forward<i>, a collection of six stories of the near and far future from out-of-this-world authors. Each piece can be read or listened to in a single thought-provoking sitting.</i>",
+          "categories": [],
+          "cover": "/landing-covers/9781542044257.jpg"
+        },
+        {
+          "id": "urn:isbn:9780399563867",
+          "isbn": "9780399563867",
+          "title": "The Hike",
+          "authors": [
+            "Drew Magary"
+          ],
+          "categories": [],
+          "cover": "/landing-covers/9780399563867.jpg"
+        },
+        {
+          "id": "urn:isbn:9781101620069",
+          "isbn": "9781101620069",
+          "title": "Silvers [02] The Song of the Orphans",
+          "authors": [
+            "Daniel Price"
+          ],
+          "categories": [],
+          "cover": "/landing-covers/9781101620069.jpg"
+        },
+        {
+          "id": "urn:isbn:9781101904237",
+          "isbn": "9781101904237",
+          "title": "Dark Matter",
+          "authors": [
+            "Blake Crouch"
+          ],
+          "summary": "From the bestselling author Blake Crouch, Dark Matter is a mind-bending thriller about choices, paths not taken, and how far we’ll go to claim the lives we dream of.",
+          "categories": [],
+          "cover": "/landing-covers/9781101904237.jpg"
+        },
+        {
+          "id": "urn:isbn:9780553418293",
+          "isbn": "9780553418293",
+          "title": "The Fold: A Novel",
+          "authors": [
+            "Peter Clines"
+          ],
+          "categories": [
+            "Fiction",
+            "Science Fiction",
+            "Action & Adventure",
+            "Time Travel"
+          ],
+          "cover": "/landing-covers/9780553418293.jpg"
+        },
+        {
+          "id": "urn:isbn:9780698142763",
+          "isbn": "9780698142763",
+          "title": "The Gone World",
+          "authors": [
+            "Tom Sweterlitsch"
+          ],
+          "summary": "Inception meets True Detective in this science fiction thriller of spellbinding tension and staggering scope that follows a special agent into a savage murder case with grave implications for the fate of mankind... “I promise you have ...",
+          "categories": [
+            "Science Fiction",
+            "Fantasy",
+            "Dystopian",
+            "Action & Adventure",
+            "Contemporary Fiction",
+            "Mystery",
+            "Suspense"
+          ],
+          "cover": "/landing-covers/9780698142763.jpg"
+        },
+        {
+          "id": "urn:isbn:9781681468785",
+          "isbn": "9781681468785",
+          "title": "A Second Chance: The Chronicles of St. Mary's Book Three",
+          "authors": [
+            "Jodi Taylor"
+          ],
+          "categories": [],
+          "cover": "/landing-covers/9781681468785.jpg"
+        },
+        {
+          "id": "urn:isbn:9781416965190",
+          "isbn": "9781416965190",
+          "title": "Morpheus Road 01 - The Light",
+          "authors": [
+            "D.J. MacHale"
+          ],
+          "categories": [],
+          "cover": "/landing-covers/9781416965190.jpg"
+        },
+        {
+          "id": "urn:isbn:9781101620045",
+          "isbn": "9781101620045",
+          "title": "The Flight of the Silvers",
+          "authors": [
+            "Daniel Price"
+          ],
+          "categories": [],
+          "cover": "/landing-covers/9781101620045.jpg"
+        },
+        {
+          "id": "urn:isbn:9780735217904",
+          "isbn": "9780735217904",
+          "title": "The War of the Givens",
+          "authors": [
+            "Daniel Price"
+          ],
+          "categories": [],
+          "cover": "/landing-covers/9780735217904.jpg"
+        },
+        {
+          "id": "urn:isbn:9780765327253",
+          "isbn": "9780765327253",
+          "title": "One Second After",
+          "authors": [
+            "William R. Forstchen"
+          ],
+          "summary": "It is a weapon that the Wall Street Journal warns could shatter America. In the tradition of On the Beach, Fail Safe and Testament, this book, set in a typical American town, is a dire warning of what might be our future...and our end.",
+          "categories": [
+            "Science Fiction",
+            "Fiction",
+            "Suspense",
+            "Thrillers",
+            "Mystery and Suspense Fiction",
+            "Fiction - Espionage",
+            "Thriller"
+          ],
+          "cover": "/landing-covers/9780765327253.jpg"
+        },
+        {
+          "id": "urn:isbn:MBed88618795e1",
+          "isbn": "MBed88618795e1",
+          "title": "Oathbringer: The Stormlight Archive Book Three",
+          "authors": [
+            "Brandon Sanderson"
+          ],
+          "categories": [],
+          "cover": "/landing-covers/MBed88618795e1.jpg"
+        },
+        {
+          "id": "urn:isbn:9780553804676",
+          "isbn": "9780553804676",
+          "title": "The Lies of Locke Lamora",
+          "authors": [
+            "Scott Lynch"
+          ],
+          "summary": "Debut author Lynch pens a witty and fast-paced narrative that is nearly as much of a con as the wily schemes of its hero.",
+          "categories": [
+            "Fantasy",
+            "Action & Adventure",
+            "Young Adult",
+            "Science Fiction",
+            "Contemporary Fiction",
+            "Epic Fantasy",
+            "Mystery",
+            "Crime"
+          ],
+          "cover": "/landing-covers/9780553804676.jpg"
+        }
+      ]
+    },
+    {
+      "key": "releases",
+      "title": "Recent Releases",
+      "href": "/opds/releases",
+      "entries": [
+        {
+          "id": "urn:isbn:9780593820315",
+          "isbn": "9780593820315",
+          "title": "Operation Bounce House",
+          "authors": [
+            "Matt Dinniman"
+          ],
+          "categories": [],
+          "cover": "/landing-covers/9780593820315.jpg"
+        },
+        {
+          "id": "urn:isbn:MB033c7f2656a5",
+          "isbn": "MB033c7f2656a5",
+          "title": "Absolution (Southern Reach)",
+          "authors": [
+            "VanderMeer, Jeff"
+          ],
+          "categories": [],
+          "cover": "/landing-covers/MB033c7f2656a5.jpg"
+        },
+        {
+          "id": "urn:isbn:9780735217904",
+          "isbn": "9780735217904",
+          "title": "The War of the Givens",
+          "authors": [
+            "Daniel Price"
+          ],
+          "categories": [],
+          "cover": "/landing-covers/9780735217904.jpg"
+        },
+        {
+          "id": "urn:isbn:9781958204009",
+          "isbn": "9781958204009",
+          "title": "Soul Fraud",
+          "authors": [
+            "Andrew Givler"
+          ],
+          "summary": "Matthew Carver has a terrible life. Seriously - it's awful. It is so bad that Dan the Demon is shocked when Matt turns down his infernal offer: ten years of a blissful life in exchange for his soul.<br /><br />But Dan is a salesman behind on his quota and his demonic managers are running out of patience. He forges Matt's signature on the dotted line, stealing his soul and thrusting him into a supernatural world he never knew existed.<br /><br />Now Matt must figure out how to get his soul back and stop a war before it is too late...",
+          "categories": [
+            "Fantasy",
+            "Contemporary Fiction",
+            "Crime",
+            "Paranormal",
+            "Science Fiction",
+            "Coming of Age",
+            "Urban Fantasy",
+            "Humor",
+            "Young Adult"
+          ],
+          "cover": "/landing-covers/9781958204009.jpg"
+        }
+      ]
+    }
+  ]
+}

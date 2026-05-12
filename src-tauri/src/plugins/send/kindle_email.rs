@@ -114,7 +114,7 @@ impl SendTarget for KindleEmailTarget {
         let subject = match (&req.title, &req.author) {
             (Some(t), Some(a)) => format!("{} — {}", t, a),
             (Some(t), None) => t.clone(),
-            _ => "CommonStacks book".into(),
+            _ => "Common Stacks book".into(),
         };
 
         let attachment = Attachment::new(filename).body(bytes, content_type.parse()?);
@@ -128,7 +128,7 @@ impl SendTarget for KindleEmailTarget {
                     .singlepart(
                         SinglePart::builder()
                             .header(ContentType::TEXT_PLAIN)
-                            .body("Sent via CommonStacks.".to_string()),
+                            .body("Sent via Common Stacks.".to_string()),
                     )
                     .singlepart(attachment),
             )?;

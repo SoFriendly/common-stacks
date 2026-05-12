@@ -21,7 +21,7 @@ export function UpdateChecker() {
           <>
             <h3 className="font-display text-base">Update available</h3>
             <p className="mt-1 text-xs text-ink-soft">
-              CommonStacks {status.version} is ready to install.
+              Common Stacks {status.version} is ready to install.
             </p>
             {status.notes && (
               <pre className="mt-2 max-h-24 overflow-y-auto whitespace-pre-wrap text-[11px] text-ink-soft">
@@ -74,7 +74,7 @@ export function UpdateChecker() {
         {status.kind === "ready" && (
           <>
             <h3 className="font-display text-base">Update installed</h3>
-            <p className="mt-1 text-xs text-ink-soft">Restart CommonStacks to use the new version.</p>
+            <p className="mt-1 text-xs text-ink-soft">Restart Common Stacks to use the new version.</p>
             <div className="mt-3 flex justify-end gap-2">
               <button
                 onClick={dismiss}

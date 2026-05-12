@@ -33,5 +33,18 @@
   ::-webkit-scrollbar-thumb:hover {
     background: rgba(0, 0, 0, 0.25);
   }
+  /* Landing page preview window: keep scrolling but hide the bar. */
+  .preview-scroll {
+    scrollbar-width: none;
+  }
+  .preview-scroll::-webkit-scrollbar {
+    display: none;
+  }
+  .preview-scroll .flex.gap-5.overflow-x-auto {
+    scrollbar-width: none;
+  }
+  .preview-scroll .flex.gap-5.overflow-x-auto::-webkit-scrollbar {
+    display: none;
+  }
 }
 

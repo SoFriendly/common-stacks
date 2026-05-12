@@ -113,7 +113,8 @@ export function Library() {
     setRefreshing(true);
     let cancelled = false;
     (async () => {
-      const sources = await api.listSources();
+      const allSources = await api.listSources();
+      const sources = allSources.filter((s) => s.enabled);
       if (cancelled || seq !== loadSeq.current) return;
       setBlocks(sources.map((source) => ({ source, rails: [], loading: true })));
       await Promise.all(sources.map((s) => hydrate(s)));

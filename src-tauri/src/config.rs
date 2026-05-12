@@ -112,6 +112,17 @@ pub fn load_or_seed() -> Config {
                 enabled: true,
                 auth: AuthConfig::None,
             },
+            // Standard Ebooks ships disabled — the catalog requires Patrons
+            // Circle authentication (HTTP Basic, your email as the username,
+            // password left blank). Enable it in Settings → Libraries and
+            // add the auth there.
+            Source {
+                id: "standard-ebooks".into(),
+                name: "Standard Ebooks".into(),
+                url: "https://standardebooks.org/feeds/opds/all".into(),
+                enabled: false,
+                auth: AuthConfig::None,
+            },
         ],
         preferences: Preferences::default(),
         send_targets: Default::default(),

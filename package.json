@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "snapshot:landing": "bun run scripts/snapshot-landing.ts",
+    "dev:landing": "vite --open /landing.html",
+    "build:landing": "BUILD_TARGET=landing tsc && BUILD_TARGET=landing vite build"
   },
   "dependencies": {
     "react": "^19.2.6",

@@ -149,31 +149,13 @@ export function Settings() {
             <div className="p-4 text-sm text-ink-soft">No libraries.</div>
           )}
           {sources.map((s) => (
-            <div
+            <SourceRow
               key={s.id}
-              className="flex items-center justify-between gap-4 border-b border-shelf p-4 last:border-b-0"
-            >
-              <div className="min-w-0">
-                <div className="font-display text-lg">{s.name}</div>
-                <div className="truncate text-xs text-ink-soft">{s.url}</div>
-              </div>
-              <div className="flex items-center gap-3 text-sm">
-                <button
-                  onClick={() => handleToggle(s)}
-                  className={`rounded px-2.5 py-1 ${
-                    s.enabled ? "bg-shelf text-ink" : "text-ink-soft"
-                  }`}
-                >
-                  {s.enabled ? "Enabled" : "Disabled"}
-                </button>
-                <button
-                  onClick={() => handleRemove(s.id)}
-                  className="text-xs text-ink-soft hover:text-ink"
-                >
-                  Remove
-                </button>
-              </div>
-            </div>
+              source={s}
+              onToggle={() => handleToggle(s)}
+              onRemove={() => handleRemove(s.id)}
+              onSaved={refresh}
+            />
           ))}
         </div>
       </section>
@@ -289,7 +271,7 @@ export function Settings() {
       <section className="mb-12 max-w-2xl">
         <h2 className="mb-3 font-display text-xl">Plugins</h2>
         <p className="mb-3 text-xs text-ink-soft">
-          Plugins extend CommonStacks with new metadata sources, send-to targets, and EPUB transformers.
+          Plugins extend Common Stacks with new metadata sources, send-to targets, and EPUB transformers.
         </p>
         <PluginsPanel />
       </section>
@@ -370,7 +352,7 @@ function UpdatePanel() {
   return (
     <div className="flex items-center justify-between rounded-md border border-shelf bg-white p-3">
       <div>
-        <div className="text-sm">CommonStacks {version || "—"}</div>
+        <div className="text-sm">Common Stacks {version || "—"}</div>
         {statusText && <div className="mt-0.5 text-xs text-ink-soft">{statusText}</div>}
       </div>
       <button
@@ -642,7 +624,7 @@ function PluginsPanel() {
         <div className="mb-3 text-[11px] text-ink-soft">
           Drop a built plugin folder (containing <code>manifest.json</code> and
           its native library) into{" "}
-          <code className="break-all">{dir}</code> then restart CommonStacks.
+          <code className="break-all">{dir}</code> then restart Common Stacks.
           See <code>docs/PLUGIN_DEVELOPMENT.md</code> for the protocol.
         </div>
       )}
@@ -692,6 +674,186 @@ function PluginsPanel() {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function SourceRow({
+  source,
+  onToggle,
+  onRemove,
+  onSaved,
+}: {
+  source: Source;
+  onToggle: () => void;
+  onRemove: () => void;
+  onSaved: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(source.name);
+  const [url, setUrl] = useState(source.url);
+  const [authKind, setAuthKind] = useState<AuthConfig["kind"]>(source.auth.kind);
+  const [authUser, setAuthUser] = useState(
+    source.auth.kind === "basic" ? source.auth.username : "",
+  );
+  const [authPassword, setAuthPassword] = useState(
+    source.auth.kind === "basic" ? source.auth.password : "",
+  );
+  const [authToken, setAuthToken] = useState(
+    source.auth.kind === "bearer" ? source.auth.token : "",
+  );
+  const [authCookie, setAuthCookie] = useState(
+    source.auth.kind === "cookie" ? source.auth.cookie : "",
+  );
+  const [saving, setSaving] = useState(false);
+
+  function buildAuth(): AuthConfig {
+    switch (authKind) {
+      case "basic":
+        return { kind: "basic", username: authUser, password: authPassword };
+      case "bearer":
+        return { kind: "bearer", token: authToken };
+      case "cookie":
+        return { kind: "cookie", cookie: authCookie };
+      default:
+        return { kind: "none" };
+    }
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await api.updateSource({
+        ...source,
+        name,
+        url,
+        auth: buildAuth(),
+      });
+      setEditing(false);
+      onSaved();
+    } catch (e) {
+      window.alert(`Save failed: ${e}`);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="border-b border-shelf last:border-b-0">
+      <div className="flex items-center justify-between gap-4 p-4">
+        <button
+          onClick={() => setEditing((v) => !v)}
+          className="min-w-0 flex-1 text-left"
+        >
+          <div className="flex items-center gap-1.5 font-display text-lg">
+            <ChevronDown
+              className={`h-4 w-4 text-ink-soft transition-transform ${
+                editing ? "rotate-0" : "-rotate-90"
+              }`}
+            />
+            <span>{source.name}</span>
+          </div>
+          <div className="ml-5 truncate text-xs text-ink-soft">{source.url}</div>
+        </button>
+        <div className="flex items-center gap-3 text-sm">
+          <button
+            onClick={onToggle}
+            className={`rounded px-2.5 py-1 ${
+              source.enabled ? "bg-shelf text-ink" : "text-ink-soft"
+            }`}
+          >
+            {source.enabled ? "Enabled" : "Disabled"}
+          </button>
+          <button
+            onClick={onRemove}
+            className="text-xs text-ink-soft hover:text-ink"
+          >
+            Remove
+          </button>
+        </div>
+      </div>
+
+      {editing && (
+        <div className="border-t border-shelf bg-shelf/30 px-4 py-4">
+          <div className="grid gap-3">
+            <input
+              value={name}
+              onChange={(e) => setName(e.currentTarget.value)}
+              placeholder="Name"
+              className="rounded-md border border-shelf bg-white px-3 py-2 text-sm"
+            />
+            <input
+              value={url}
+              onChange={(e) => setUrl(e.currentTarget.value)}
+              placeholder="OPDS URL"
+              className="rounded-md border border-shelf bg-white px-3 py-2 text-sm"
+            />
+            <div>
+              <label className="block text-xs text-ink-soft">Authentication</label>
+              <select
+                value={authKind}
+                onChange={(e) =>
+                  setAuthKind(e.currentTarget.value as AuthConfig["kind"])
+                }
+                className="mt-1 w-full rounded-md border border-shelf bg-white px-3 py-2 text-sm"
+              >
+                <option value="none">None</option>
+                <option value="basic">HTTP Basic</option>
+                <option value="bearer">Bearer token</option>
+                <option value="cookie">Cookie</option>
+              </select>
+            </div>
+            {authKind === "basic" && (
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  value={authUser}
+                  onChange={(e) => setAuthUser(e.currentTarget.value)}
+                  placeholder="Username / email"
+                  autoComplete="off"
+                  className="rounded-md border border-shelf bg-white px-3 py-2 text-sm"
+                />
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.currentTarget.value)}
+                  placeholder="Password (leave blank if not required)"
+                  autoComplete="off"
+                  className="rounded-md border border-shelf bg-white px-3 py-2 text-sm"
+                />
+              </div>
+            )}
+            {authKind === "bearer" && (
+              <input
+                type="password"
+                value={authToken}
+                onChange={(e) => setAuthToken(e.currentTarget.value)}
+                placeholder="Bearer token"
+                autoComplete="off"
+                className="rounded-md border border-shelf bg-white px-3 py-2 text-sm"
+              />
+            )}
+            {authKind === "cookie" && (
+              <input
+                type="password"
+                value={authCookie}
+                onChange={(e) => setAuthCookie(e.currentTarget.value)}
+                placeholder="Cookie header value"
+                autoComplete="off"
+                className="rounded-md border border-shelf bg-white px-3 py-2 text-sm"
+              />
+            )}
+            <div>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="rounded-md bg-ink px-4 py-1.5 text-sm text-paper disabled:opacity-50"
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
