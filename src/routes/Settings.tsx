@@ -266,14 +266,6 @@ export function Settings() {
       </section>
 
       <section className="mb-12 max-w-2xl">
-        <h2 className="mb-3 font-display text-xl">Plugins</h2>
-        <p className="mb-3 text-xs text-ink-soft">
-          Plugins extend Common Stacks with new metadata sources, send-to targets, and EPUB transformers.
-        </p>
-        <PluginsPanel />
-      </section>
-
-      <section className="mb-12 max-w-2xl">
         <h2 className="mb-3 font-display text-xl">Send-to targets</h2>
         <p className="mb-3 text-xs text-ink-soft">
           Configure where downloaded books can be delivered (Kindle, WebDAV).
@@ -286,7 +278,7 @@ export function Settings() {
         <UpdatePanel />
       </section>
 
-      <section className="max-w-2xl">
+      <section className="mb-12 max-w-2xl">
         <h2 className="mb-3 font-display text-xl">Import / Export</h2>
         <div className="flex gap-2">
           <button
@@ -302,6 +294,14 @@ export function Settings() {
             Import…
           </button>
         </div>
+      </section>
+
+      <section className="max-w-2xl">
+        <h2 className="mb-3 font-display text-xl">Plugins</h2>
+        <p className="mb-3 text-xs text-ink-soft">
+          Plugins extend Common Stacks with new metadata sources, send-to targets, and EPUB transformers.
+        </p>
+        <PluginsPanel />
       </section>
     </div>
   );
