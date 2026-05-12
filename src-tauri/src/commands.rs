@@ -3,8 +3,8 @@ use crate::dedup::{self, MergedBook};
 use crate::downloads::{self, DownloadedFile};
 use crate::opds::feed::Feed;
 use crate::plugins::{
-    EnrichQuery, EnrichedMetadata, PluginDescriptor, SendRequest, SendResult, SendTargetSettings,
-    SettingField,
+    EnrichQuery, EnrichedMetadata, PluginDescriptor, SendContext, SendProgress, SendRequest,
+    SendResult, SendTargetSettings, SettingField,
 };
 use crate::state::AppState;
 use futures::future::join_all;
@@ -93,13 +93,17 @@ pub struct ValidateResult {
 }
 
 #[tauri::command]
-pub async fn validate_source(state: State<'_, AppState>, url: String) -> CmdResult<ValidateResult> {
+pub async fn validate_source(
+    state: State<'_, AppState>,
+    url: String,
+    auth: Option<AuthConfig>,
+) -> CmdResult<ValidateResult> {
     let probe = Source {
         id: "__probe".into(),
         name: "probe".into(),
         url: url.clone(),
         enabled: true,
-        auth: AuthConfig::None,
+        auth: auth.unwrap_or(AuthConfig::None),
     };
     match state.client.fetch_feed(&probe, &url).await {
         Ok(f) => Ok(ValidateResult {
@@ -345,6 +349,7 @@ pub struct SendTargetInfo {
     pub descriptor: PluginDescriptor,
     pub schema: Vec<SettingField>,
     pub configured: bool,
+    pub enabled: bool,
 }
 
 #[tauri::command]
@@ -380,10 +385,12 @@ pub async fn list_send_targets(state: State<'_, AppState>) -> CmdResult<Vec<Send
         .map(|t| {
             let d = t.descriptor();
             let configured = cfg.send_targets.get(&d.id).map_or(false, |m| !m.is_empty());
+            let enabled = cfg.send_target_enabled.get(&d.id).copied().unwrap_or(false);
             SendTargetInfo {
                 descriptor: d,
                 schema: t.settings_schema(),
                 configured,
+                enabled,
             }
         })
         .collect())
@@ -412,7 +419,24 @@ pub async fn save_send_target_settings(
 }
 
 #[tauri::command]
-pub async fn send_book(state: State<'_, AppState>, request: SendRequest) -> CmdResult<SendResult> {
+pub async fn set_send_target_enabled(
+    state: State<'_, AppState>,
+    target_id: String,
+    enabled: bool,
+) -> CmdResult<()> {
+    {
+        let mut cfg = state.config.write().await;
+        cfg.send_target_enabled.insert(target_id, enabled);
+    }
+    state.save().await.map_err(err)
+}
+
+#[tauri::command]
+pub async fn send_book(
+    state: State<'_, AppState>,
+    request: SendRequest,
+    on_progress: tauri::ipc::Channel<SendProgress>,
+) -> CmdResult<SendResult> {
     let target = state
         .plugins
         .find_send_target(&request.target_id)
@@ -425,7 +449,10 @@ pub async fn send_book(state: State<'_, AppState>, request: SendRequest) -> CmdR
             .unwrap_or_default()
     };
     let settings = SendTargetSettings { fields };
-    target.send(&request, &settings).await.map_err(err)
+    let ctx = SendContext {
+        progress: on_progress,
+    };
+    target.send(&request, &settings, &ctx).await.map_err(err)
 }
 
 #[tauri::command]

@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import {
   api,
+  type AuthConfig,
   type SendTargetInfo,
   type SettingField,
   type Source,
   type ValidateResult,
 } from "../lib/api";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { ChevronDown } from "lucide-react";
 
 export function Settings() {
   const [sources, setSources] = useState<Source[]>([]);
@@ -16,8 +18,34 @@ export function Settings() {
   // Add-source form
   const [newName, setNewName] = useState("");
   const [newUrl, setNewUrl] = useState("");
+  const [authKind, setAuthKind] = useState<AuthConfig["kind"]>("none");
+  const [authUser, setAuthUser] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authToken, setAuthToken] = useState("");
+  const [authCookie, setAuthCookie] = useState("");
   const [validating, setValidating] = useState(false);
   const [validation, setValidation] = useState<ValidateResult | null>(null);
+
+  function buildAuth(): AuthConfig {
+    switch (authKind) {
+      case "basic":
+        return { kind: "basic", username: authUser, password: authPassword };
+      case "bearer":
+        return { kind: "bearer", token: authToken };
+      case "cookie":
+        return { kind: "cookie", cookie: authCookie };
+      default:
+        return { kind: "none" };
+    }
+  }
+
+  function resetAuth() {
+    setAuthKind("none");
+    setAuthUser("");
+    setAuthPassword("");
+    setAuthToken("");
+    setAuthCookie("");
+  }
 
   async function refresh() {
     setSources(await api.listSources());
@@ -33,7 +61,7 @@ export function Settings() {
     setValidating(true);
     setValidation(null);
     try {
-      setValidation(await api.validateSource(newUrl));
+      setValidation(await api.validateSource(newUrl, buildAuth()));
     } finally {
       setValidating(false);
     }
@@ -41,9 +69,10 @@ export function Settings() {
 
   async function handleAdd() {
     if (!newName || !newUrl) return;
-    await api.addSource({ name: newName, url: newUrl });
+    await api.addSource({ name: newName, url: newUrl, auth: buildAuth() });
     setNewName("");
     setNewUrl("");
+    resetAuth();
     setValidation(null);
     refresh();
   }
@@ -160,6 +189,58 @@ export function Settings() {
             placeholder="https://example.com/opds"
             className="rounded-md border border-shelf bg-white px-3 py-2 text-sm"
           />
+          <div>
+            <label className="block text-xs text-ink-soft">Authentication</label>
+            <select
+              value={authKind}
+              onChange={(e) => setAuthKind(e.currentTarget.value as AuthConfig["kind"])}
+              className="mt-1 w-full rounded-md border border-shelf bg-white px-3 py-2 text-sm"
+            >
+              <option value="none">None</option>
+              <option value="basic">HTTP Basic</option>
+              <option value="bearer">Bearer token</option>
+              <option value="cookie">Cookie</option>
+            </select>
+          </div>
+          {authKind === "basic" && (
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                value={authUser}
+                onChange={(e) => setAuthUser(e.currentTarget.value)}
+                placeholder="Username"
+                autoComplete="off"
+                className="rounded-md border border-shelf bg-white px-3 py-2 text-sm"
+              />
+              <input
+                type="password"
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.currentTarget.value)}
+                placeholder="Password"
+                autoComplete="off"
+                className="rounded-md border border-shelf bg-white px-3 py-2 text-sm"
+              />
+            </div>
+          )}
+          {authKind === "bearer" && (
+            <input
+              type="password"
+              value={authToken}
+              onChange={(e) => setAuthToken(e.currentTarget.value)}
+              placeholder="Bearer token"
+              autoComplete="off"
+              className="rounded-md border border-shelf bg-white px-3 py-2 text-sm"
+            />
+          )}
+          {authKind === "cookie" && (
+            <input
+              type="password"
+              value={authCookie}
+              onChange={(e) => setAuthCookie(e.currentTarget.value)}
+              placeholder="Cookie header value (e.g. session=abc...)"
+              autoComplete="off"
+              className="rounded-md border border-shelf bg-white px-3 py-2 text-sm"
+            />
+          )}
           <div className="flex items-center gap-2">
             <button
               onClick={handleValidate}
@@ -244,31 +325,58 @@ function SendTargetsPanel() {
 
   return (
     <div className="overflow-hidden rounded-lg border border-shelf">
-      {targets.map((t) => (
-        <div key={t.descriptor.id} className="border-b border-shelf last:border-b-0">
-          <button
-            onClick={() => setEditing(editing === t.descriptor.id ? null : t.descriptor.id)}
-            className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left hover:bg-shelf/50"
-          >
-            <div className="min-w-0">
-              <div className="font-display text-base">{t.descriptor.name}</div>
-              <div className="truncate text-xs text-ink-soft">{t.descriptor.description}</div>
+      {targets.map((t) => {
+        const needsSetup = t.schema.some((f) => f.required) && !t.configured;
+        const canEnable = !needsSetup;
+        return (
+          <div key={t.descriptor.id} className="border-b border-shelf last:border-b-0">
+            <div className="flex items-center gap-4 px-4 py-3">
+              <button
+                onClick={() => setEditing(editing === t.descriptor.id ? null : t.descriptor.id)}
+                className="group/row min-w-0 flex-1 text-left"
+                aria-expanded={editing === t.descriptor.id}
+              >
+                <div className="flex items-center gap-1.5 font-display text-base">
+                  <ChevronDown
+                    className={`h-4 w-4 text-ink-soft transition-transform ${
+                      editing === t.descriptor.id ? "rotate-0" : "-rotate-90"
+                    }`}
+                  />
+                  <span>{t.descriptor.name}</span>
+                </div>
+                <div className="ml-5 text-xs text-ink-soft leading-snug">
+                  {t.descriptor.description}
+                </div>
+              </button>
+              {needsSetup && (
+                <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider text-ink-soft">
+                  Needs setup
+                </span>
+              )}
+              <Toggle
+                disabled={!canEnable}
+                checked={t.enabled}
+                title={
+                  canEnable
+                    ? t.enabled
+                      ? "Enabled — visible on books"
+                      : "Disabled — hidden from books"
+                    : "Configure required fields to enable"
+                }
+                onChange={async (next) => {
+                  await api.setSendTargetEnabled(t.descriptor.id, next);
+                  refresh();
+                }}
+              />
             </div>
-            <span
-              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider ${
-                t.configured ? "bg-shelf text-ink" : "text-ink-soft"
-              }`}
-            >
-              {t.configured ? "Configured" : "Not set up"}
-            </span>
-          </button>
-          {editing === t.descriptor.id && (
-            <div className="border-t border-shelf bg-shelf/30 px-4 py-4">
-              <SendTargetForm target={t} onSaved={() => { refresh(); setEditing(null); }} />
-            </div>
-          )}
-        </div>
-      ))}
+            {editing === t.descriptor.id && (
+              <div className="border-t border-shelf bg-shelf/30 px-4 py-4">
+                <SendTargetForm target={t} onSaved={() => { refresh(); setEditing(null); }} />
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -284,8 +392,16 @@ function SendTargetForm({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    api.getSendTargetSettings(target.descriptor.id).then(setValues);
-  }, [target.descriptor.id]);
+    api.getSendTargetSettings(target.descriptor.id).then((saved) => {
+      // Layer saved values on top of schema defaults so an unconfigured target
+      // still shows sensible pre-filled fields (e.g. crosspoint.local).
+      const seeded: Record<string, string> = {};
+      for (const f of target.schema) {
+        if (f.default !== undefined) seeded[f.key] = f.default;
+      }
+      setValues({ ...seeded, ...saved });
+    });
+  }, [target.descriptor.id, target.schema]);
 
   function inputType(kind: SettingField["kind"]) {
     switch (kind) {
@@ -317,26 +433,46 @@ function SendTargetForm({
 
   return (
     <form onSubmit={handleSubmit} className="grid gap-3">
-      {target.schema.map((field) => (
-        <label key={field.key} className="block">
-          <div className="text-xs text-ink-soft">
-            {field.label}
-            {field.required && <span className="text-red-700"> *</span>}
+      {target.schema.map((field) =>
+        field.kind === "boolean" ? (
+          <div key={field.key} className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-xs text-ink-soft">{field.label}</div>
+              {field.help && (
+                <div className="mt-0.5 text-[11px] text-ink-soft">{field.help}</div>
+              )}
+            </div>
+            <Toggle
+              checked={values[field.key] === "true"}
+              onChange={(next) =>
+                setValues((v) => ({ ...v, [field.key]: next ? "true" : "false" }))
+              }
+            />
           </div>
-          <input
-            type={inputType(field.kind)}
-            value={values[field.key] ?? ""}
-            placeholder={field.placeholder}
-            onChange={(e) =>
-              setValues((v) => ({ ...v, [field.key]: e.currentTarget.value }))
-            }
-            className="mt-1 w-full rounded-md border border-shelf bg-white px-3 py-2 text-sm"
-            required={field.required}
-            autoComplete="off"
-          />
-          {field.help && <div className="mt-0.5 text-[11px] text-ink-soft">{field.help}</div>}
-        </label>
-      ))}
+        ) : (
+          <label key={field.key} className="block">
+            <div className="text-xs text-ink-soft">
+              {field.label}
+              {field.required && <span className="text-red-700"> *</span>}
+            </div>
+            <input
+              type={inputType(field.kind)}
+              value={values[field.key] ?? ""}
+              placeholder={field.placeholder}
+              onChange={(e) => {
+                const next = e.currentTarget.value;
+                setValues((v) => ({ ...v, [field.key]: next }));
+              }}
+              className="mt-1 w-full rounded-md border border-shelf bg-white px-3 py-2 text-sm"
+              required={field.required}
+              autoComplete="off"
+            />
+            {field.help && (
+              <div className="mt-0.5 text-[11px] text-ink-soft">{field.help}</div>
+            )}
+          </label>
+        ),
+      )}
       <div>
         <button
           type="submit"
@@ -347,5 +483,41 @@ function SendTargetForm({
         </button>
       </div>
     </form>
+  );
+}
+
+function Toggle({
+  checked,
+  onChange,
+  disabled,
+  title,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  disabled?: boolean;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      title={title}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+        disabled
+          ? "cursor-not-allowed bg-shelf opacity-50"
+          : checked
+            ? "bg-ink"
+            : "bg-shelf"
+      }`}
+    >
+      <span
+        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-paper shadow-sm transition-transform ${
+          checked ? "translate-x-[18px]" : "translate-x-1"
+        }`}
+      />
+    </button>
   );
 }

@@ -1,6 +1,6 @@
 use crate::plugins::{
-    PluginDescriptor, SendRequest, SendResult, SendTarget, SendTargetSettings, SettingField,
-    SettingKind,
+    PluginDescriptor, SendContext, SendRequest, SendResult, SendTarget, SendTargetSettings,
+    SettingField, SettingKind,
 };
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -28,6 +28,7 @@ impl SendTarget for WebDavTarget {
                 required: true,
                 kind: SettingKind::Url,
                 placeholder: Some("https://cloud.example.com/path/".into()),
+                default: None,
             },
             SettingField {
                 key: "username".into(),
@@ -36,6 +37,7 @@ impl SendTarget for WebDavTarget {
                 required: false,
                 kind: SettingKind::Text,
                 placeholder: None,
+                default: None,
             },
             SettingField {
                 key: "password".into(),
@@ -44,6 +46,7 @@ impl SendTarget for WebDavTarget {
                 required: false,
                 kind: SettingKind::Secret,
                 placeholder: None,
+                default: None,
             },
         ]
     }
@@ -52,6 +55,7 @@ impl SendTarget for WebDavTarget {
         &self,
         req: &SendRequest,
         settings: &SendTargetSettings,
+        _ctx: &SendContext,
     ) -> Result<SendResult> {
         let base = settings
             .fields

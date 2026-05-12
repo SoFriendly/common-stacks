@@ -5,13 +5,14 @@ import { CoverCard } from "../components/CoverCard";
 import { CategoryTile } from "../components/CategoryTile";
 import { Rail } from "../components/Rail";
 import { openEntry } from "../lib/entry";
+import { maybeApply as applyEnrichmentToEntry } from "../lib/enrichment";
 import {
   Search as SearchIcon,
   X,
-  Download as DownloadIcon,
   Settings as SettingsIcon,
   RefreshCw,
 } from "lucide-react";
+import { ViewToggle } from "../components/ViewToggle";
 
 type RailContent =
   | { kind: "entries"; entries: Entry[] }
@@ -35,6 +36,15 @@ interface SourceBlock {
 
 const MAX_RAILS_PER_SOURCE = 6;
 const MAX_CATEGORIES_PER_RAIL = 24;
+
+// Stale-while-revalidate window: tabbing back within this many ms reuses
+// cached blocks instantly; longer than this triggers a background refresh.
+const SWR_TTL_MS = 10 * 60 * 1000;
+
+// Module-level cache so navigating between routes doesn't redo every OPDS
+// fetch. Survives unmount/remount but is dropped on full app reload.
+let cachedBlocks: SourceBlock[] | null = null;
+let cachedAt = 0;
 
 function pickSubsections(navigation: Link[]): Link[] {
   const skip = new Set([
@@ -60,7 +70,7 @@ function pickSubsections(navigation: Link[]): Link[] {
 }
 
 export function Library() {
-  const [blocks, setBlocks] = useState<SourceBlock[]>([]);
+  const [blocks, setBlocks] = useState<SourceBlock[]>(() => cachedBlocks ?? []);
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
@@ -107,7 +117,15 @@ export function Library() {
       if (cancelled || seq !== loadSeq.current) return;
       setBlocks(sources.map((source) => ({ source, rails: [], loading: true })));
       await Promise.all(sources.map((s) => hydrate(s)));
-      if (seq === loadSeq.current) setRefreshing(false);
+      if (seq === loadSeq.current) {
+        setRefreshing(false);
+        // Capture the now-populated blocks for the in-memory cache.
+        setBlocks((current) => {
+          cachedBlocks = current;
+          cachedAt = Date.now();
+          return current;
+        });
+      }
 
       async function hydrate(source: Source) {
         try {
@@ -127,7 +145,7 @@ export function Library() {
                           key: `${source.id}:root`,
                           title: feed.title || source.name,
                           href: source.url,
-                          content: { kind: "entries", entries: feed.entries },
+                          content: { kind: "entries", entries: feed.entries.map(applyEnrichmentToEntry) },
                           loading: false,
                         },
                       ],
@@ -177,7 +195,7 @@ export function Library() {
                 const { feed: sf } = await api.fetchFeed(source.id, sub.href);
                 const content: RailContent =
                   sf.entries.length > 0
-                    ? { kind: "entries", entries: sf.entries }
+                    ? { kind: "entries", entries: sf.entries.map(applyEnrichmentToEntry) }
                     : {
                         kind: "categories",
                         links: pickSubsections(sf.navigation).slice(
@@ -235,6 +253,13 @@ export function Library() {
   }
 
   useEffect(() => {
+    if (cachedBlocks && Date.now() - cachedAt < SWR_TTL_MS) {
+      // Cache is warm — show it instantly, no fetch.
+      return;
+    }
+    if (cachedBlocks) {
+      // We already have something to render; refresh in background.
+    }
     loadLibrary();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -248,13 +273,8 @@ export function Library() {
 
   return (
     <div className="px-10 pb-16">
-      <header className="mb-8 flex items-end justify-between gap-6">
-        <div>
-          <h1 className="font-display text-3xl tracking-tight text-ink">Library</h1>
-          <p className="mt-1 text-sm text-ink-soft">
-            Wander your stacks. Discovery across every connected library.
-          </p>
-        </div>
+      <header className="mb-8 flex items-center justify-between gap-6">
+        <ViewToggle />
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -285,9 +305,6 @@ export function Library() {
           )}
         </form>
         <div className="flex items-center gap-1">
-          <IconLink to="/downloads" label="Downloads">
-            <DownloadIcon className="h-4 w-4" />
-          </IconLink>
           <button
             onClick={loadLibrary}
             disabled={refreshing}
@@ -459,21 +476,24 @@ function SearchResultsView({
         <p className="text-sm text-ink-soft">No results.</p>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-x-5 gap-y-8">
-          {result.merged.map((b) => (
-            <div key={b.key} className="flex flex-col">
-              <CoverCard
-                title={b.title}
-                authors={b.authors}
-                cover={b.cover ?? b.thumbnail}
-                onClick={() => onOpen(b)}
-              />
-              {b.sources.length > 1 && (
-                <div className="mt-1 px-1 text-[11px] text-ink-soft">
-                  from {b.sources.length} libraries
-                </div>
-              )}
-            </div>
-          ))}
+          {result.merged.map((b) => {
+            const enriched = applyEnrichmentToEntry(mergedBookAsEntry(b));
+            return (
+              <div key={b.key} className="flex flex-col">
+                <CoverCard
+                  title={enriched.title}
+                  authors={enriched.authors}
+                  cover={enriched.cover ?? enriched.thumbnail}
+                  onClick={() => onOpen(b)}
+                />
+                {b.sources.length > 1 && (
+                  <div className="mt-1 px-1 text-[11px] text-ink-soft">
+                    from {b.sources.length} libraries
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
       {result.errors.length > 0 && (
@@ -487,6 +507,24 @@ function SearchResultsView({
       )}
     </>
   );
+}
+
+function mergedBookAsEntry(b: MergedBook): Entry {
+  const primary = b.sources[0];
+  return {
+    id: primary?.entry_id ?? b.key,
+    title: b.title,
+    authors: b.authors,
+    summary: b.summary,
+    identifiers: b.identifiers,
+    categories: b.categories,
+    series: b.series,
+    language: b.language,
+    cover: b.cover,
+    thumbnail: b.thumbnail,
+    acquisitions: b.acquisitions,
+    navigation: [],
+  };
 }
 
 function openMergedBook(navigate: ReturnType<typeof useNavigate>, b: MergedBook) {

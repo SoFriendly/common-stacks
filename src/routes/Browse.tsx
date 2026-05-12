@@ -4,6 +4,7 @@ import { api, type Feed } from "../lib/api";
 import { CoverCard } from "../components/CoverCard";
 import { CategoryTile } from "../components/CategoryTile";
 import { openEntry } from "../lib/entry";
+import { maybeApply as applyEnrichmentToEntry } from "../lib/enrichment";
 
 export function Browse() {
   const [params] = useSearchParams();
@@ -102,15 +103,18 @@ export function Browse() {
             <h2 className="mb-3 font-display text-xl">Titles</h2>
           )}
           <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-x-5 gap-y-8">
-            {feed.entries.map((e) => (
-              <CoverCard
-                key={e.id}
-                title={e.title}
-                authors={e.authors}
-                cover={e.cover ?? e.thumbnail}
-                onClick={() => openEntry(navigate, { sourceId, entry: e })}
-              />
-            ))}
+            {feed.entries.map((raw) => {
+              const e = applyEnrichmentToEntry(raw);
+              return (
+                <CoverCard
+                  key={e.id}
+                  title={e.title}
+                  authors={e.authors}
+                  cover={e.cover ?? e.thumbnail}
+                  onClick={() => openEntry(navigate, { sourceId, entry: e })}
+                />
+              );
+            })}
           </div>
         </section>
       )}

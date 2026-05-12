@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router";
 import {
   api,
   type DownloadedFile,
@@ -8,18 +7,13 @@ import {
 } from "../lib/api";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { DefaultCover } from "../components/DefaultCover";
-import { MoreHorizontal } from "lucide-react";
-
-function BackLink() {
-  return (
-    <Link
-      to="/library"
-      className="mb-4 inline-block text-xs text-ink-soft hover:text-ink"
-    >
-      ← Library
-    </Link>
-  );
-}
+import { MoreHorizontal, Settings as SettingsIcon } from "lucide-react";
+import { ViewToggle } from "../components/ViewToggle";
+import { NavLink } from "react-router";
+import {
+  SendProgressModal,
+  type SendModalState,
+} from "../components/SendProgressModal";
 
 type View = "grid" | "list";
 
@@ -33,6 +27,7 @@ export function Downloads() {
   const [items, setItems] = useState<FileWithMeta[]>([]);
   const [view, setView] = useState<View>("grid");
   const [sendTargets, setSendTargets] = useState<SendTargetInfo[]>([]);
+  const [sendModal, setSendModal] = useState<SendModalState | null>(null);
 
   useEffect(() => {
     api.listSendTargets().then(setSendTargets);
@@ -104,53 +99,98 @@ export function Downloads() {
   }
 
   async function handleSend(file: FileWithMeta, target: SendTargetInfo) {
-    if (!target.configured) {
-      if (window.confirm(`${target.descriptor.name} isn't configured. Open Settings now?`)) {
+    const needsSetup =
+      target.schema.some((f) => f.required) && !target.configured;
+    if (needsSetup) {
+      if (
+        window.confirm(`${target.descriptor.name} isn't configured. Open Settings now?`)
+      ) {
         window.location.assign("/settings");
       }
       return;
     }
+    const title = file.meta?.title ?? stripExt(file.file.name);
+    setSendModal({ kind: "sending", target, title, steps: [] });
     try {
-      const r = await api.sendBook({
-        target_id: target.descriptor.id,
-        file_path: file.file.path,
-        title: file.meta?.title,
-        author: file.meta?.authors[0],
+      const r = await api.sendBook(
+        {
+          target_id: target.descriptor.id,
+          file_path: file.file.path,
+          title: file.meta?.title,
+          author: file.meta?.authors[0],
+        },
+        (p) => {
+          setSendModal((prev) => {
+            if (!prev) return prev;
+            const steps = [...prev.steps];
+            const last = steps[steps.length - 1];
+            // Collapse consecutive events in the same stage so the per-image
+            // loop replaces one line in place instead of spamming the list.
+            if (last && last.stage === p.stage) {
+              steps[steps.length - 1] = p;
+            } else {
+              steps.push(p);
+            }
+            return { ...prev, steps };
+          });
+        },
+      );
+      setSendModal((prev) => {
+        const steps = prev?.steps ?? [];
+        if (r.ok) {
+          return { kind: "done", target, title, message: r.message, steps };
+        }
+        return {
+          kind: "error",
+          target,
+          title,
+          message: friendlyError(r.message, target.descriptor.id),
+          steps,
+        };
       });
-      if (r.ok) window.alert(r.message);
-      else window.alert(`Send failed: ${r.message}`);
     } catch (e) {
-      window.alert(`Send failed: ${e}`);
+      setSendModal((prev) => ({
+        kind: "error",
+        target,
+        title,
+        message: friendlyError(String(e), target.descriptor.id),
+        steps: prev?.steps ?? [],
+      }));
     }
   }
 
   return (
     <div className="px-10 pb-16">
-      <BackLink />
-      <header className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-3xl tracking-tight">Downloads</h1>
-          <p className="mt-1 text-sm text-ink-soft">
-            Books saved to your CommonStacks folder.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setView("grid")}
-            className={`rounded px-3 py-1.5 text-sm ${
-              view === "grid" ? "bg-ink text-paper" : "text-ink-soft"
-            }`}
+      <SendProgressModal state={sendModal} onClose={() => setSendModal(null)} />
+      <header className="mb-6 flex items-center justify-between gap-6">
+        <ViewToggle />
+        <div className="flex items-center gap-2">
+          <div className="mr-2 flex overflow-hidden rounded-md bg-shelf/60 p-0.5 text-sm">
+            <button
+              onClick={() => setView("grid")}
+              className={`rounded px-3 py-1 ${
+                view === "grid" ? "bg-paper text-ink shadow-sm" : "text-ink-soft"
+              }`}
+            >
+              Grid
+            </button>
+            <button
+              onClick={() => setView("list")}
+              className={`rounded px-3 py-1 ${
+                view === "list" ? "bg-paper text-ink shadow-sm" : "text-ink-soft"
+              }`}
+            >
+              List
+            </button>
+          </div>
+          <NavLink
+            to="/settings"
+            aria-label="Settings"
+            title="Settings"
+            className="flex h-9 w-9 items-center justify-center rounded-md text-ink-soft transition-colors hover:bg-shelf hover:text-ink"
           >
-            Grid
-          </button>
-          <button
-            onClick={() => setView("list")}
-            className={`rounded px-3 py-1.5 text-sm ${
-              view === "list" ? "bg-ink text-paper" : "text-ink-soft"
-            }`}
-          >
-            List
-          </button>
+            <SettingsIcon className="h-4 w-4" />
+          </NavLink>
         </div>
       </header>
 
@@ -227,7 +267,13 @@ function DownloadGridCard({
 
   return (
     <div className="group/card flex flex-col">
-      <div className="relative">
+      <div
+        className="relative"
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setMenuOpen(true);
+        }}
+      >
         <button
           onClick={onOpen}
           className="relative aspect-[2/3] w-full overflow-hidden rounded-md bg-shelf shadow-sm ring-1 ring-black/5 transition-shadow hover:shadow-lg"
@@ -277,18 +323,22 @@ function DownloadGridCard({
               className="absolute right-0 z-30 mt-1 w-40 overflow-hidden rounded-md border border-shelf bg-paper shadow-lg ring-1 ring-black/10"
               onClick={(e) => e.stopPropagation()}
             >
-              {sendTargets.map((t) => (
-                <MenuItem
-                  key={t.descriptor.id}
-                  onClick={withClose(() => onSend(t))}
-                >
-                  Send to {t.descriptor.name.replace(/^Send to /, "")}
-                  {!t.configured && (
-                    <span className="ml-1 text-[10px] text-ink-soft">(setup)</span>
-                  )}
-                </MenuItem>
-              ))}
-              {sendTargets.length > 0 && (
+              {sendTargets
+                .filter((t) => {
+                  if (!t.enabled) return false;
+                  const needsSetup =
+                    t.schema.some((f) => f.required) && !t.configured;
+                  return !needsSetup;
+                })
+                .map((t) => (
+                  <MenuItem
+                    key={t.descriptor.id}
+                    onClick={withClose(() => onSend(t))}
+                  >
+                    Send to {t.descriptor.name.replace(/^Send to /, "")}
+                  </MenuItem>
+                ))}
+              {sendTargets.some((t) => t.enabled && !(t.schema.some((f) => f.required) && !t.configured)) && (
                 <div className="my-1 border-t border-shelf" />
               )}
               <MenuItem onClick={withClose(onReveal)}>Reveal in Finder</MenuItem>
@@ -388,6 +438,24 @@ function DownloadList({
       </tbody>
     </table>
   );
+}
+
+function friendlyError(raw: string, targetId?: string): string {
+  const cleaned = raw
+    .replace(/error sending request for url \([^)]*\)\.?\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const looksLikeConnectivity =
+    /Could not reach|error sending request|connection refused|connect timed out|dns error|no such host/i.test(
+      raw,
+    );
+  if (targetId === "crosspoint" && looksLikeConnectivity) {
+    return "Couldn't reach the Crosspoint Reader. Make sure you navigate to File Transfer → Join a Network on your Crosspoint device, and that it's on the same Wi-Fi network as this computer.";
+  }
+  if (targetId === "crosspoint" && /sd card/i.test(raw)) {
+    return `${cleaned} — make sure the destination folder exists on the Crosspoint's SD card (you can change it in Settings → Send-to targets).`;
+  }
+  return cleaned || raw;
 }
 
 function stripExt(name: string): string {

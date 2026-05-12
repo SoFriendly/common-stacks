@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, Channel } from "@tauri-apps/api/core";
 
 export type AuthConfig =
   | { kind: "none" }
@@ -116,7 +116,7 @@ export interface EnrichedMetadata {
   identifiers: string[];
 }
 
-export type SettingKind = "text" | "secret" | "email" | "url" | "number";
+export type SettingKind = "text" | "secret" | "email" | "url" | "number" | "boolean";
 
 export interface SettingField {
   key: string;
@@ -125,12 +125,14 @@ export interface SettingField {
   required: boolean;
   kind: SettingKind;
   placeholder?: string;
+  default?: string;
 }
 
 export interface SendTargetInfo {
   descriptor: PluginDescriptor;
   schema: SettingField[];
   configured: boolean;
+  enabled: boolean;
 }
 
 export interface SendRequest {
@@ -143,6 +145,13 @@ export interface SendRequest {
 export interface SendResult {
   ok: boolean;
   message: string;
+}
+
+export interface SendProgress {
+  stage: string;
+  message: string;
+  current?: number;
+  total?: number;
 }
 
 export interface EpubMetadata {
@@ -169,7 +178,8 @@ export const api = {
   removeSource: (id: string) => invoke<void>("remove_source", { id }),
   updateSource: (source: Source) => invoke<void>("update_source", { source }),
   reorderSources: (ids: string[]) => invoke<void>("reorder_sources", { ids }),
-  validateSource: (url: string) => invoke<ValidateResult>("validate_source", { url }),
+  validateSource: (url: string, auth?: AuthConfig) =>
+    invoke<ValidateResult>("validate_source", { url, auth }),
 
   fetchFeed: (sourceId: string, url?: string) =>
     invoke<{ source_id: string; feed: Feed }>("fetch_feed", { sourceId, url }),
@@ -205,5 +215,11 @@ export const api = {
     invoke<Record<string, string>>("get_send_target_settings", { targetId }),
   saveSendTargetSettings: (targetId: string, fields: Record<string, string>) =>
     invoke<void>("save_send_target_settings", { targetId, fields }),
-  sendBook: (request: SendRequest) => invoke<SendResult>("send_book", { request }),
+  setSendTargetEnabled: (targetId: string, enabled: boolean) =>
+    invoke<void>("set_send_target_enabled", { targetId, enabled }),
+  sendBook: (request: SendRequest, onProgress?: (p: SendProgress) => void) => {
+    const channel = new Channel<SendProgress>();
+    if (onProgress) channel.onmessage = onProgress;
+    return invoke<SendResult>("send_book", { request, onProgress: channel });
+  },
 };

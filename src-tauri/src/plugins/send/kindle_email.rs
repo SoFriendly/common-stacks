@@ -1,6 +1,6 @@
 use crate::plugins::{
-    PluginDescriptor, SendRequest, SendResult, SendTarget, SendTargetSettings, SettingField,
-    SettingKind,
+    PluginDescriptor, SendContext, SendRequest, SendResult, SendTarget, SendTargetSettings,
+    SettingField, SettingKind,
 };
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -32,6 +32,7 @@ impl SendTarget for KindleEmailTarget {
                 required: true,
                 kind: SettingKind::Email,
                 placeholder: Some("yourname@kindle.com".into()),
+                default: None,
             },
             SettingField {
                 key: "from_address".into(),
@@ -42,6 +43,7 @@ impl SendTarget for KindleEmailTarget {
                 required: true,
                 kind: SettingKind::Email,
                 placeholder: None,
+                default: None,
             },
             SettingField {
                 key: "smtp_host".into(),
@@ -50,6 +52,7 @@ impl SendTarget for KindleEmailTarget {
                 required: true,
                 kind: SettingKind::Text,
                 placeholder: Some("smtp.example.com".into()),
+                default: None,
             },
             SettingField {
                 key: "smtp_port".into(),
@@ -58,6 +61,7 @@ impl SendTarget for KindleEmailTarget {
                 required: true,
                 kind: SettingKind::Number,
                 placeholder: Some("587".into()),
+                default: Some("587".into()),
             },
             SettingField {
                 key: "smtp_username".into(),
@@ -66,6 +70,7 @@ impl SendTarget for KindleEmailTarget {
                 required: true,
                 kind: SettingKind::Text,
                 placeholder: None,
+                default: None,
             },
             SettingField {
                 key: "smtp_password".into(),
@@ -74,6 +79,7 @@ impl SendTarget for KindleEmailTarget {
                 required: true,
                 kind: SettingKind::Secret,
                 placeholder: None,
+                default: None,
             },
         ]
     }
@@ -82,6 +88,7 @@ impl SendTarget for KindleEmailTarget {
         &self,
         req: &SendRequest,
         settings: &SendTargetSettings,
+        _ctx: &SendContext,
     ) -> Result<SendResult> {
         let get = |k: &str| -> Result<&String> {
             settings

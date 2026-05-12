@@ -49,6 +49,7 @@ pub fn run() {
             commands::list_send_targets,
             commands::get_send_target_settings,
             commands::save_send_target_settings,
+            commands::set_send_target_enabled,
             commands::send_book,
         ])
         .run(tauri::generate_context!())

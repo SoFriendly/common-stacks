@@ -64,6 +64,10 @@ pub struct Config {
     /// Per-send-target settings, keyed by target id (e.g. "kindle-email").
     #[serde(default)]
     pub send_targets: std::collections::HashMap<String, std::collections::HashMap<String, String>>,
+    /// Whether each send target is currently enabled (visible on books).
+    /// Missing entries default to `false` so new targets are opt-in.
+    #[serde(default)]
+    pub send_target_enabled: std::collections::HashMap<String, bool>,
 }
 
 pub fn config_dir() -> PathBuf {
@@ -111,6 +115,7 @@ pub fn load_or_seed() -> Config {
         ],
         preferences: Preferences::default(),
         send_targets: Default::default(),
+        send_target_enabled: Default::default(),
     };
     let _ = save(&seeded);
     seeded

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { api, type Acquisition, type Entry, type EnrichedMetadata } from "../lib/api";
 import { DefaultCover } from "../components/DefaultCover";
+import { set as cacheEnrichment, applyToEntry } from "../lib/enrichment";
 
 /** State passed via navigation when clicking a cover. */
 export interface BookNavState {
@@ -145,7 +146,11 @@ export function Book() {
           if (cancelled) return;
           if (result) {
             setEnrichment(result);
-            setEntry((prev) => (prev ? applyEnrichment(prev, result) : prev));
+            setEntry((prev) => {
+              if (!prev) return prev;
+              cacheEnrichment(prev, result);
+              return applyToEntry(prev, result);
+            });
             return; // first usable result wins
           }
         }
@@ -343,34 +348,6 @@ function pickIsbn(e: Entry): string | null {
     if (m) return m[1];
   }
   return null;
-}
-
-function applyEnrichment(entry: Entry, m: EnrichedMetadata): Entry {
-  const merged: Entry = {
-    ...entry,
-    summary: entry.summary ?? m.description,
-    language: entry.language ?? m.language,
-    published: entry.published ?? m.published,
-    cover: entry.cover ?? m.cover_url,
-    thumbnail: entry.thumbnail ?? m.cover_url,
-    categories: mergeStrings(entry.categories, m.subjects),
-    identifiers: mergeStrings(entry.identifiers, m.identifiers),
-    authors: entry.authors.length > 0 ? entry.authors : m.authors,
-  };
-  return merged;
-}
-
-function mergeStrings(a: string[], b: string[]): string[] {
-  const seen = new Set(a.map((s) => s.toLowerCase()));
-  const out = [...a];
-  for (const s of b) {
-    const key = s.toLowerCase();
-    if (!seen.has(key)) {
-      seen.add(key);
-      out.push(s);
-    }
-  }
-  return out;
 }
 
 function mergeEntry(prev: Entry, next: Entry): Entry {

@@ -12,6 +12,7 @@
 
 pub mod metadata;
 pub mod send;
+pub mod transform;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -54,6 +55,8 @@ pub enum SettingKind {
     Email,
     Url,
     Number,
+    /// Renders as a toggle. Stored as the string "true" or "false".
+    Boolean,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,6 +70,8 @@ pub struct SettingField {
     pub kind: SettingKind,
     #[serde(default)]
     pub placeholder: Option<String>,
+    #[serde(default)]
+    pub default: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -88,6 +93,48 @@ pub struct SendResult {
     pub message: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SendProgress {
+    pub stage: String,
+    pub message: String,
+    #[serde(default)]
+    pub current: Option<u64>,
+    #[serde(default)]
+    pub total: Option<u64>,
+}
+
+impl SendProgress {
+    pub fn stage(stage: &str, message: impl Into<String>) -> Self {
+        Self {
+            stage: stage.into(),
+            message: message.into(),
+            current: None,
+            total: None,
+        }
+    }
+    pub fn ratio(stage: &str, message: impl Into<String>, current: u64, total: u64) -> Self {
+        Self {
+            stage: stage.into(),
+            message: message.into(),
+            current: Some(current),
+            total: Some(total),
+        }
+    }
+}
+
+/// Context passed to `SendTarget::send` so plugins can stream progress back to
+/// the UI. Cheap to clone — wraps a Tauri Channel internally.
+#[derive(Clone)]
+pub struct SendContext {
+    pub progress: tauri::ipc::Channel<SendProgress>,
+}
+
+impl SendContext {
+    pub fn emit(&self, p: SendProgress) {
+        let _ = self.progress.send(p);
+    }
+}
+
 #[async_trait]
 pub trait MetadataEnricher: Send + Sync {
     fn descriptor(&self) -> PluginDescriptor;
@@ -102,12 +149,31 @@ pub trait SendTarget: Send + Sync {
         &self,
         req: &SendRequest,
         settings: &SendTargetSettings,
+        ctx: &SendContext,
     ) -> anyhow::Result<SendResult>;
+}
+
+/// A pre-upload byte transformer. Transformers can declare which file
+/// extensions they apply to so the registry can wire them into send targets
+/// conditionally (e.g. EPUB image optimizer only runs for .epub files).
+#[allow(dead_code)] // Surface used by future plugin loader; currently invoked directly.
+#[async_trait]
+pub trait Transformer: Send + Sync {
+    fn descriptor(&self) -> PluginDescriptor;
+    fn settings_schema(&self) -> Vec<SettingField>;
+    /// Lowercase, no-dot file extensions this transformer handles.
+    fn applies_to(&self) -> &[&'static str];
+    async fn transform(
+        &self,
+        input: Vec<u8>,
+        settings: &SendTargetSettings,
+    ) -> anyhow::Result<Vec<u8>>;
 }
 
 pub struct PluginRegistry {
     enrichers: Vec<Arc<dyn MetadataEnricher>>,
     send_targets: Vec<Arc<dyn SendTarget>>,
+    transformers: Vec<Arc<dyn Transformer>>,
 }
 
 impl PluginRegistry {
@@ -115,6 +181,7 @@ impl PluginRegistry {
         let mut reg = Self {
             enrichers: Vec::new(),
             send_targets: Vec::new(),
+            transformers: Vec::new(),
         };
         reg.register_builtins();
         reg
@@ -124,9 +191,13 @@ impl PluginRegistry {
         self.enrichers
             .push(Arc::new(metadata::openlibrary::OpenLibraryEnricher::new()));
         self.send_targets
+            .push(Arc::new(send::crosspoint::CrosspointTarget));
+        self.send_targets
             .push(Arc::new(send::kindle_email::KindleEmailTarget));
         self.send_targets
             .push(Arc::new(send::webdav::WebDavTarget));
+        self.transformers
+            .push(Arc::new(transform::epub_optimizer::EpubOptimizer));
     }
 
     pub fn enrichers(&self) -> &[Arc<dyn MetadataEnricher>] {
@@ -135,6 +206,11 @@ impl PluginRegistry {
 
     pub fn send_targets(&self) -> &[Arc<dyn SendTarget>] {
         &self.send_targets
+    }
+
+    #[allow(dead_code)]
+    pub fn transformers(&self) -> &[Arc<dyn Transformer>] {
+        &self.transformers
     }
 
     pub fn find_enricher(&self, id: &str) -> Option<Arc<dyn MetadataEnricher>> {
@@ -146,6 +222,14 @@ impl PluginRegistry {
 
     pub fn find_send_target(&self, id: &str) -> Option<Arc<dyn SendTarget>> {
         self.send_targets
+            .iter()
+            .find(|t| t.descriptor().id == id)
+            .cloned()
+    }
+
+    #[allow(dead_code)]
+    pub fn find_transformer(&self, id: &str) -> Option<Arc<dyn Transformer>> {
+        self.transformers
             .iter()
             .find(|t| t.descriptor().id == id)
             .cloned()
