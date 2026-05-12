@@ -43,7 +43,7 @@ if [ "$BUMP" != "--no-bump" ]; then
 fi
 
 VERSION=$(grep '"version"' src-tauri/tauri.conf.json | head -1 | sed 's/.*"version": "\(.*\)".*/\1/')
-echo "Building CommonStacks $VERSION (macOS arm64)"
+echo "Building CommonStacks $VERSION (macOS universal — arm64 + x86_64)"
 
 if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ] && [ -n "$TAURI_SIGNING_PRIVATE_KEY_PATH" ]; then
   export TAURI_SIGNING_PRIVATE_KEY=$(cat "$TAURI_SIGNING_PRIVATE_KEY_PATH")
@@ -56,9 +56,9 @@ fi
 bun install >/dev/null
 bun run build
 
-bunx @tauri-apps/cli build --target aarch64-apple-darwin
+bunx @tauri-apps/cli build --target universal-apple-darwin
 
-BUNDLE_DIR="src-tauri/target/aarch64-apple-darwin/release/bundle"
+BUNDLE_DIR="src-tauri/target/universal-apple-darwin/release/bundle"
 DMG=$(find "$BUNDLE_DIR/dmg" -name "*.dmg" | head -1)
 APP=$(find "$BUNDLE_DIR/macos" -maxdepth 1 -name "*.app" | head -1)
 
@@ -66,7 +66,7 @@ APP=$(find "$BUNDLE_DIR/macos" -maxdepth 1 -name "*.app" | head -1)
 # the updater tarball + minisign .sig in $BUNDLE_DIR/macos. Mirror everything
 # the uploader looks for under the canonical no-space CommonStacks_* names.
 mkdir -p src-tauri/target/release/bundle/dmg
-cp "$DMG" "src-tauri/target/release/bundle/dmg/CommonStacks_${VERSION}_aarch64.dmg"
+cp "$DMG" "src-tauri/target/release/bundle/dmg/CommonStacks_${VERSION}_universal.dmg"
 
 SRC_TAR=$(find "$BUNDLE_DIR/macos" -maxdepth 1 -name "*.app.tar.gz" | head -1)
 SRC_SIG=$(find "$BUNDLE_DIR/macos" -maxdepth 1 -name "*.app.tar.gz.sig" | head -1)
@@ -76,7 +76,7 @@ if [ -z "$SRC_TAR" ] || [ -z "$SRC_SIG" ]; then
   echo "TAURI_SIGNING_PRIVATE_KEY was set during the build."
   exit 1
 fi
-TAR="src-tauri/target/release/bundle/CommonStacks_${VERSION}_darwin-aarch64.app.tar.gz"
+TAR="src-tauri/target/release/bundle/CommonStacks_${VERSION}_darwin-universal.app.tar.gz"
 cp "$SRC_TAR" "$TAR"
 cp "$SRC_SIG" "${TAR}.sig"
 

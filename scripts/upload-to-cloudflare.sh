@@ -61,14 +61,14 @@ upload() {
   fi
 }
 
-# --- macOS ---
-DMG="src-tauri/target/release/bundle/dmg/${APP}_${VERSION}_aarch64.dmg"
-[ ! -f "$DMG" ] && DMG=$(find src-tauri/target/aarch64-apple-darwin/release/bundle/dmg -name "*.dmg" 2>/dev/null | head -1)
-[ -n "$DMG" ] && upload "$DMG" "v${VERSION}/${APP}_${VERSION}_aarch64.dmg"
+# --- macOS (universal) ---
+DMG="src-tauri/target/release/bundle/dmg/${APP}_${VERSION}_universal.dmg"
+[ ! -f "$DMG" ] && DMG=$(find src-tauri/target/universal-apple-darwin/release/bundle/dmg -name "*.dmg" 2>/dev/null | head -1)
+[ -n "$DMG" ] && upload "$DMG" "v${VERSION}/${APP}_${VERSION}_universal.dmg"
 
-MAC_TAR="src-tauri/target/release/bundle/${APP}_${VERSION}_darwin-aarch64.app.tar.gz"
-upload "$MAC_TAR" "v${VERSION}/${APP}_${VERSION}_darwin-aarch64.app.tar.gz"
-upload "${MAC_TAR}.sig" "v${VERSION}/${APP}_${VERSION}_darwin-aarch64.app.tar.gz.sig"
+MAC_TAR="src-tauri/target/release/bundle/${APP}_${VERSION}_darwin-universal.app.tar.gz"
+upload "$MAC_TAR" "v${VERSION}/${APP}_${VERSION}_darwin-universal.app.tar.gz"
+upload "${MAC_TAR}.sig" "v${VERSION}/${APP}_${VERSION}_darwin-universal.app.tar.gz.sig"
 
 # --- Linux (CI artifacts) ---
 for arch in x86_64 aarch64; do
@@ -105,8 +105,9 @@ s3 s3 cp "s3://${CLOUDFLARE_R2_BUCKET}/latest.json" "$LATEST" --no-progress 2>/d
 
 FILTER=""
 if [ -n "$MAC_SIG" ]; then
-  FILTER="$FILTER | .platforms[\"darwin-aarch64\"] = {\"signature\": \$mac, \"url\": \"$PUBLIC_BASE/v\(\$ver)/${APP}_\(\$ver)_darwin-aarch64.app.tar.gz\"}"
-  FILTER="$FILTER | .platforms[\"darwin-x86_64\"] = {\"signature\": \$mac, \"url\": \"$PUBLIC_BASE/v\(\$ver)/${APP}_\(\$ver)_darwin-aarch64.app.tar.gz\"}"
+  # Universal binary — both arm64 and x86_64 installs pull the same tarball.
+  FILTER="$FILTER | .platforms[\"darwin-aarch64\"] = {\"signature\": \$mac, \"url\": \"$PUBLIC_BASE/v\(\$ver)/${APP}_\(\$ver)_darwin-universal.app.tar.gz\"}"
+  FILTER="$FILTER | .platforms[\"darwin-x86_64\"] = {\"signature\": \$mac, \"url\": \"$PUBLIC_BASE/v\(\$ver)/${APP}_\(\$ver)_darwin-universal.app.tar.gz\"}"
 fi
 [ -n "$LINUX_X64_SIG" ] && FILTER="$FILTER | .platforms[\"linux-x86_64\"] = {\"signature\": \$linx, \"url\": \"$PUBLIC_BASE/v\(\$ver)/${APP}_\(\$ver)_amd64.AppImage\"}"
 [ -n "$LINUX_ARM_SIG" ] && FILTER="$FILTER | .platforms[\"linux-aarch64\"] = {\"signature\": \$linarm, \"url\": \"$PUBLIC_BASE/v\(\$ver)/${APP}_\(\$ver)_arm64.AppImage\"}"

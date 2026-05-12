@@ -68,7 +68,7 @@ export default {
         const version = (platformKey && extractVersion(platformKey)) || latest.version;
 
         const fileMap: Record<string, string> = {
-          dmg: `v${version}/${APP}_${version}_aarch64.dmg`,
+          dmg: `v${version}/${APP}_${version}_universal.dmg`,
           AppImage: `v${version}/${APP}_${version}_${archSuffix}.AppImage`,
           deb: `v${version}/${APP}_${version}_${archSuffix}.deb`,
           msi: `v${version}/${APP}_${version}_x64-setup.msi`,
