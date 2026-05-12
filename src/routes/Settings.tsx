@@ -622,8 +622,8 @@ function PluginsPanel() {
       </div>
       {dir && (
         <div className="mb-3 text-[11px] text-ink-soft">
-          Drop a built plugin folder (containing <code>manifest.json</code> and
-          its native library) into{" "}
+          Drop a plugin folder (containing <code>manifest.json</code> and an
+          executable script or binary) into{" "}
           <code className="break-all">{dir}</code> then restart Common Stacks.
           See <code>docs/PLUGIN_DEVELOPMENT.md</code> for the protocol.
         </div>

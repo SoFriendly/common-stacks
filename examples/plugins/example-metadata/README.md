@@ -1,28 +1,26 @@
 # Example Metadata Plugin
 
-A minimal CommonStacks plugin that demonstrates the v1 plugin ABI. It echoes
-the search query back with a fake description and one subject ("Example").
-
-## Build
-
-```bash
-cd examples/plugins/example-metadata
-cargo build --release
-```
-
-This produces the platform library:
-- macOS: `target/release/libexample_metadata.dylib`
-- Linux: `target/release/libexample_metadata.so`
-- Windows: `target/release/example_metadata.dll`
+A minimal CommonStacks plugin written as a Python script. No compilation, no
+toolchain — copy the folder, restart, done.
 
 ## Install
 
-1. Find your CommonStacks plugins directory (Settings → Plugins → **Open plugins folder**).
-2. Create a subfolder named `example-metadata`.
-3. Copy the built library *and* this folder's `manifest.json` into it.
-   - **Important on Windows:** rename `library` in `manifest.json` to `example_metadata.dll`.
+1. In CommonStacks, open **Settings → Plugins → Open plugins folder**.
+2. Copy this entire folder (`example-metadata/`) into it.
+3. Make sure the script is executable (it should already be):
+   ```bash
+   chmod +x example-metadata/plugin.py
+   ```
 4. Restart CommonStacks.
 
-Open any book detail page — the description chip should mention "A book titled …".
+Open any book detail page — the description chip should mention
+"A book titled …".
+
+## How it works
+
+The whole thing is two files: `manifest.json` describing what the plugin
+provides, and `plugin.py` implementing it. CommonStacks calls
+`./plugin.py enrich` per book, pipes a JSON query on stdin, and reads the
+enriched metadata back from stdout. No FFI, no shared types, no ABI risk.
 
 See `docs/PLUGIN_DEVELOPMENT.md` for the full protocol.

@@ -226,11 +226,24 @@ impl PluginRegistry {
     }
 
     fn register_user_plugins(&mut self) {
-        for enricher in loader::load_metadata_enrichers() {
-            let id = enricher.descriptor().id;
+        let loaded = loader::load_all();
+        for p in loaded.enrichers {
+            let id = p.descriptor().id;
             tracing::info!("loaded user metadata enricher plugin: {}", id);
             self.sources.insert(id, PluginSource::User);
-            self.enrichers.push(enricher);
+            self.enrichers.push(p);
+        }
+        for p in loaded.send_targets {
+            let id = p.descriptor().id;
+            tracing::info!("loaded user send-target plugin: {}", id);
+            self.sources.insert(id, PluginSource::User);
+            self.send_targets.push(p);
+        }
+        for p in loaded.transformers {
+            let id = p.descriptor().id;
+            tracing::info!("loaded user transformer plugin: {}", id);
+            self.sources.insert(id, PluginSource::User);
+            self.transformers.push(p);
         }
     }
 

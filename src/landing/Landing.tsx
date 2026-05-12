@@ -75,10 +75,11 @@ function SiteHeader() {
           Common Stacks
         </a>
         <a
-          href="#download"
-          className="rounded-md bg-ink px-3.5 py-1.5 text-sm text-paper transition-opacity hover:opacity-90"
+          href="https://releases.commonstacks.com/commonstacks-latest.dmg"
+          className="inline-flex items-center gap-1.5 rounded-md bg-ink px-3.5 py-1.5 text-sm text-paper transition-opacity hover:opacity-90"
         >
-          Download
+          <Download className="h-3.5 w-3.5" />
+          Download for macOS
         </a>
       </div>
     </header>
@@ -113,7 +114,7 @@ function Hero() {
           </p>
           <div id="download" className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <a
-              href="https://github.com/SoFriendly/common-stacks/releases/latest"
+              href="https://releases.commonstacks.com/commonstacks-latest.dmg"
               className="inline-flex items-center gap-2 rounded-md bg-ink px-5 py-2.5 text-sm text-paper transition-opacity hover:opacity-90"
             >
               <Download className="h-4 w-4" />
@@ -173,7 +174,6 @@ function PreviewWindow({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </div>
-      <p className="mt-4 text-center text-xs text-ink-soft">Click around.</p>
     </section>
   );
 }
