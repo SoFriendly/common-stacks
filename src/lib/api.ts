@@ -215,6 +215,8 @@ export const api = {
   importConfig: (json: string) => invoke<void>("import_config", { json }),
 
   listPlugins: () => invoke<InstalledPlugin[]>("list_plugins"),
+  pluginsDir: () => invoke<string>("plugins_dir"),
+  revealPluginsDir: () => invoke<void>("reveal_plugins_dir"),
   listEnrichers: () => invoke<PluginDescriptor[]>("list_enrichers"),
   enrichBook: (enricherId: string, query: EnrichQuery) =>
     invoke<EnrichedMetadata | null>("enrich_book", { enricherId, query }),

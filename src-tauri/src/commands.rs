@@ -3,8 +3,8 @@ use crate::dedup::{self, MergedBook};
 use crate::downloads::{self, DownloadedFile};
 use crate::opds::feed::Feed;
 use crate::plugins::{
-    EnrichQuery, EnrichedMetadata, PluginDescriptor, SendContext, SendProgress, SendRequest,
-    SendResult, SendTargetSettings, SettingField,
+    EnrichQuery, EnrichedMetadata, PluginDescriptor, PluginSource, SendContext, SendProgress,
+    SendRequest, SendResult, SendTargetSettings, SettingField,
 };
 use crate::state::AppState;
 use futures::future::join_all;
@@ -354,28 +354,76 @@ pub struct InstalledPlugin {
 #[tauri::command]
 pub async fn list_plugins(state: State<'_, AppState>) -> CmdResult<Vec<InstalledPlugin>> {
     let mut out = Vec::new();
+    let label = |s: PluginSource| match s {
+        PluginSource::Builtin => "builtin",
+        PluginSource::User => "user",
+    };
     for p in state.plugins.enrichers() {
+        let d = p.descriptor();
+        let source = label(state.plugins.source_for(&d.id));
         out.push(InstalledPlugin {
             category: "metadata",
-            descriptor: p.descriptor(),
-            source: "builtin",
+            descriptor: d,
+            source,
         });
     }
     for p in state.plugins.send_targets() {
+        let d = p.descriptor();
+        let source = label(state.plugins.source_for(&d.id));
         out.push(InstalledPlugin {
             category: "send",
-            descriptor: p.descriptor(),
-            source: "builtin",
+            descriptor: d,
+            source,
         });
     }
     for p in state.plugins.transformers() {
+        let d = p.descriptor();
+        let source = label(state.plugins.source_for(&d.id));
         out.push(InstalledPlugin {
             category: "transformer",
-            descriptor: p.descriptor(),
-            source: "builtin",
+            descriptor: d,
+            source,
         });
     }
     Ok(out)
+}
+
+#[tauri::command]
+pub fn plugins_dir() -> CmdResult<String> {
+    Ok(crate::plugins::loader::plugins_dir()
+        .to_string_lossy()
+        .into_owned())
+}
+
+#[tauri::command]
+pub fn reveal_plugins_dir() -> CmdResult<()> {
+    let dir = crate::plugins::loader::plugins_dir();
+    std::fs::create_dir_all(&dir).map_err(err)?;
+    let path = dir.to_string_lossy().to_string();
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&path)
+            .spawn()
+            .map_err(err)?;
+        return Ok(());
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(&path)
+            .spawn()
+            .map_err(err)?;
+        return Ok(());
+    }
+    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&path)
+            .spawn()
+            .map_err(err)?;
+        Ok(())
+    }
 }
 
 #[derive(serde::Serialize)]

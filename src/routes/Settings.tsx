@@ -543,10 +543,17 @@ function PluginsPanel() {
       .finally(() => setLoading(false));
   }, []);
 
-  function handleInstall() {
-    window.alert(
-      "Loading third-party plugins isn't available yet. The trait surface is in place; a dynamic loader (Rust dylib or WASM) is planned.",
-    );
+  const [dir, setDir] = useState<string>("");
+  useEffect(() => {
+    api.pluginsDir().then(setDir);
+  }, []);
+
+  async function handleReveal() {
+    try {
+      await api.revealPluginsDir();
+    } catch (e) {
+      window.alert(`Could not open folder: ${e}`);
+    }
   }
 
   const groups: { key: PluginCategory; label: string; help: string }[] = [
@@ -562,12 +569,20 @@ function PluginsPanel() {
           {loading ? "Loading…" : `${plugins.length} installed`}
         </div>
         <button
-          onClick={handleInstall}
+          onClick={handleReveal}
           className="rounded-md border border-shelf bg-white px-3 py-1.5 text-sm hover:bg-shelf"
         >
-          Install plugin…
+          Open plugins folder
         </button>
       </div>
+      {dir && (
+        <div className="mb-3 text-[11px] text-ink-soft">
+          Drop a built plugin folder (containing <code>manifest.json</code> and
+          its native library) into{" "}
+          <code className="break-all">{dir}</code> then restart CommonStacks.
+          See <code>docs/PLUGIN_DEVELOPMENT.md</code> for the protocol.
+        </div>
+      )}
 
       <div className="space-y-5">
         {groups.map((g) => {

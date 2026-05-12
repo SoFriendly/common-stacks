@@ -10,6 +10,7 @@
 //! * `SendTarget` — delivers a downloaded file to an external destination
 //!   (e.g. a Kindle email, a WebDAV server, eventually KOReader).
 
+pub mod loader;
 pub mod metadata;
 pub mod send;
 pub mod transform;
@@ -170,10 +171,20 @@ pub trait Transformer: Send + Sync {
     ) -> anyhow::Result<Vec<u8>>;
 }
 
+/// Where a plugin came from. Used by the UI to label rows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PluginSource {
+    Builtin,
+    User,
+}
+
 pub struct PluginRegistry {
     enrichers: Vec<Arc<dyn MetadataEnricher>>,
     send_targets: Vec<Arc<dyn SendTarget>>,
     transformers: Vec<Arc<dyn Transformer>>,
+    /// Plugin id → its source. Populated for both built-in plugins and any
+    /// loaded from the user's plugins directory.
+    sources: std::collections::HashMap<String, PluginSource>,
 }
 
 impl PluginRegistry {
@@ -182,22 +193,49 @@ impl PluginRegistry {
             enrichers: Vec::new(),
             send_targets: Vec::new(),
             transformers: Vec::new(),
+            sources: std::collections::HashMap::new(),
         };
         reg.register_builtins();
+        reg.register_user_plugins();
         reg
     }
 
     fn register_builtins(&mut self) {
-        self.enrichers
-            .push(Arc::new(metadata::openlibrary::OpenLibraryEnricher::new()));
-        self.send_targets
-            .push(Arc::new(send::crosspoint::CrosspointTarget));
-        self.send_targets
-            .push(Arc::new(send::kindle_email::KindleEmailTarget));
-        self.send_targets
-            .push(Arc::new(send::webdav::WebDavTarget));
-        self.transformers
-            .push(Arc::new(transform::epub_optimizer::EpubOptimizer));
+        let openlibrary = Arc::new(metadata::openlibrary::OpenLibraryEnricher::new());
+        let crosspoint = Arc::new(send::crosspoint::CrosspointTarget);
+        let kindle = Arc::new(send::kindle_email::KindleEmailTarget);
+        let webdav = Arc::new(send::webdav::WebDavTarget);
+        let optimizer = Arc::new(transform::epub_optimizer::EpubOptimizer);
+
+        self.sources
+            .insert(openlibrary.descriptor().id, PluginSource::Builtin);
+        self.sources
+            .insert(crosspoint.descriptor().id, PluginSource::Builtin);
+        self.sources
+            .insert(kindle.descriptor().id, PluginSource::Builtin);
+        self.sources
+            .insert(webdav.descriptor().id, PluginSource::Builtin);
+        self.sources
+            .insert(optimizer.descriptor().id, PluginSource::Builtin);
+
+        self.enrichers.push(openlibrary);
+        self.send_targets.push(crosspoint);
+        self.send_targets.push(kindle);
+        self.send_targets.push(webdav);
+        self.transformers.push(optimizer);
+    }
+
+    fn register_user_plugins(&mut self) {
+        for enricher in loader::load_metadata_enrichers() {
+            let id = enricher.descriptor().id;
+            tracing::info!("loaded user metadata enricher plugin: {}", id);
+            self.sources.insert(id, PluginSource::User);
+            self.enrichers.push(enricher);
+        }
+    }
+
+    pub fn source_for(&self, id: &str) -> PluginSource {
+        self.sources.get(id).copied().unwrap_or(PluginSource::Builtin)
     }
 
     pub fn enrichers(&self) -> &[Arc<dyn MetadataEnricher>] {

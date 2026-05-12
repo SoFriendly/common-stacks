@@ -1,0 +1,9 @@
+{
+  "id": "example-metadata",
+  "name": "Example Metadata",
+  "description": "A demo plugin that echoes the query back with a fake description.",
+  "version": "0.1.0",
+  "api_version": 1,
+  "library": "libexample_metadata.dylib",
+  "capabilities": ["metadata"]
+}
