@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { api, type Source, type ValidateResult } from "../lib/api";
+import {
+  api,
+  type SendTargetInfo,
+  type SettingField,
+  type Source,
+  type ValidateResult,
+} from "../lib/api";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 
 export function Settings() {
@@ -195,6 +201,14 @@ export function Settings() {
         </div>
       </section>
 
+      <section className="mb-12 max-w-2xl">
+        <h2 className="mb-3 font-display text-xl">Send-to targets</h2>
+        <p className="mb-3 text-xs text-ink-soft">
+          Configure where downloaded books can be delivered (Kindle, WebDAV).
+        </p>
+        <SendTargetsPanel />
+      </section>
+
       <section className="max-w-2xl">
         <h2 className="mb-3 font-display text-xl">Import / Export</h2>
         <div className="flex gap-2">
@@ -213,5 +227,125 @@ export function Settings() {
         </div>
       </section>
     </div>
+  );
+}
+
+function SendTargetsPanel() {
+  const [targets, setTargets] = useState<SendTargetInfo[]>([]);
+  const [editing, setEditing] = useState<string | null>(null);
+
+  async function refresh() {
+    setTargets(await api.listSendTargets());
+  }
+
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-shelf">
+      {targets.map((t) => (
+        <div key={t.descriptor.id} className="border-b border-shelf last:border-b-0">
+          <button
+            onClick={() => setEditing(editing === t.descriptor.id ? null : t.descriptor.id)}
+            className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left hover:bg-shelf/50"
+          >
+            <div className="min-w-0">
+              <div className="font-display text-base">{t.descriptor.name}</div>
+              <div className="truncate text-xs text-ink-soft">{t.descriptor.description}</div>
+            </div>
+            <span
+              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider ${
+                t.configured ? "bg-shelf text-ink" : "text-ink-soft"
+              }`}
+            >
+              {t.configured ? "Configured" : "Not set up"}
+            </span>
+          </button>
+          {editing === t.descriptor.id && (
+            <div className="border-t border-shelf bg-shelf/30 px-4 py-4">
+              <SendTargetForm target={t} onSaved={() => { refresh(); setEditing(null); }} />
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SendTargetForm({
+  target,
+  onSaved,
+}: {
+  target: SendTargetInfo;
+  onSaved: () => void;
+}) {
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.getSendTargetSettings(target.descriptor.id).then(setValues);
+  }, [target.descriptor.id]);
+
+  function inputType(kind: SettingField["kind"]) {
+    switch (kind) {
+      case "secret":
+        return "password";
+      case "email":
+        return "email";
+      case "url":
+        return "url";
+      case "number":
+        return "number";
+      default:
+        return "text";
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.saveSendTargetSettings(target.descriptor.id, values);
+      onSaved();
+    } catch (err) {
+      window.alert(`Save failed: ${err}`);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="grid gap-3">
+      {target.schema.map((field) => (
+        <label key={field.key} className="block">
+          <div className="text-xs text-ink-soft">
+            {field.label}
+            {field.required && <span className="text-red-700"> *</span>}
+          </div>
+          <input
+            type={inputType(field.kind)}
+            value={values[field.key] ?? ""}
+            placeholder={field.placeholder}
+            onChange={(e) =>
+              setValues((v) => ({ ...v, [field.key]: e.currentTarget.value }))
+            }
+            className="mt-1 w-full rounded-md border border-shelf bg-white px-3 py-2 text-sm"
+            required={field.required}
+            autoComplete="off"
+          />
+          {field.help && <div className="mt-0.5 text-[11px] text-ink-soft">{field.help}</div>}
+        </label>
+      ))}
+      <div>
+        <button
+          type="submit"
+          disabled={saving}
+          className="rounded-md bg-ink px-4 py-1.5 text-sm text-paper disabled:opacity-50"
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+      </div>
+    </form>
   );
 }

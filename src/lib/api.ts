@@ -91,6 +91,60 @@ export interface DownloadedFile {
   extension?: string;
 }
 
+export interface PluginDescriptor {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface EnrichQuery {
+  isbn?: string;
+  title?: string;
+  authors: string[];
+}
+
+export interface EnrichedMetadata {
+  source: string;
+  title?: string;
+  authors: string[];
+  description?: string;
+  subjects: string[];
+  publisher?: string;
+  published?: string;
+  language?: string;
+  cover_url?: string;
+  identifiers: string[];
+}
+
+export type SettingKind = "text" | "secret" | "email" | "url" | "number";
+
+export interface SettingField {
+  key: string;
+  label: string;
+  help?: string;
+  required: boolean;
+  kind: SettingKind;
+  placeholder?: string;
+}
+
+export interface SendTargetInfo {
+  descriptor: PluginDescriptor;
+  schema: SettingField[];
+  configured: boolean;
+}
+
+export interface SendRequest {
+  target_id: string;
+  file_path: string;
+  title?: string;
+  author?: string;
+}
+
+export interface SendResult {
+  ok: boolean;
+  message: string;
+}
+
 export interface EpubMetadata {
   title?: string;
   authors: string[];
@@ -141,4 +195,15 @@ export const api = {
 
   exportConfig: () => invoke<string>("export_config"),
   importConfig: (json: string) => invoke<void>("import_config", { json }),
+
+  listEnrichers: () => invoke<PluginDescriptor[]>("list_enrichers"),
+  enrichBook: (enricherId: string, query: EnrichQuery) =>
+    invoke<EnrichedMetadata | null>("enrich_book", { enricherId, query }),
+
+  listSendTargets: () => invoke<SendTargetInfo[]>("list_send_targets"),
+  getSendTargetSettings: (targetId: string) =>
+    invoke<Record<string, string>>("get_send_target_settings", { targetId }),
+  saveSendTargetSettings: (targetId: string, fields: Record<string, string>) =>
+    invoke<void>("save_send_target_settings", { targetId, fields }),
+  sendBook: (request: SendRequest) => invoke<SendResult>("send_book", { request }),
 };

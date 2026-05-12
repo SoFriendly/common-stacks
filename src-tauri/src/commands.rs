@@ -2,6 +2,10 @@ use crate::config::{AuthConfig, Config, Source};
 use crate::dedup::{self, MergedBook};
 use crate::downloads::{self, DownloadedFile};
 use crate::opds::feed::Feed;
+use crate::plugins::{
+    EnrichQuery, EnrichedMetadata, PluginDescriptor, SendRequest, SendResult, SendTargetSettings,
+    SettingField,
+};
 use crate::state::AppState;
 use futures::future::join_all;
 use serde::{Deserialize, Serialize};
@@ -330,6 +334,98 @@ pub async fn set_download_dir(state: State<'_, AppState>, path: String) -> CmdRe
 pub async fn export_config(state: State<'_, AppState>) -> CmdResult<String> {
     let cfg: Config = state.config.read().await.clone();
     serde_json::to_string_pretty(&cfg).map_err(err)
+}
+
+// ============================================================================
+// Plugin commands
+// ============================================================================
+
+#[derive(serde::Serialize)]
+pub struct SendTargetInfo {
+    pub descriptor: PluginDescriptor,
+    pub schema: Vec<SettingField>,
+    pub configured: bool,
+}
+
+#[tauri::command]
+pub async fn list_enrichers(state: State<'_, AppState>) -> CmdResult<Vec<PluginDescriptor>> {
+    Ok(state
+        .plugins
+        .enrichers()
+        .iter()
+        .map(|e| e.descriptor())
+        .collect())
+}
+
+#[tauri::command]
+pub async fn enrich_book(
+    state: State<'_, AppState>,
+    enricher_id: String,
+    query: EnrichQuery,
+) -> CmdResult<Option<EnrichedMetadata>> {
+    let enricher = state
+        .plugins
+        .find_enricher(&enricher_id)
+        .ok_or_else(|| format!("unknown enricher: {}", enricher_id))?;
+    enricher.enrich(&query).await.map_err(err)
+}
+
+#[tauri::command]
+pub async fn list_send_targets(state: State<'_, AppState>) -> CmdResult<Vec<SendTargetInfo>> {
+    let cfg = state.config.read().await;
+    Ok(state
+        .plugins
+        .send_targets()
+        .iter()
+        .map(|t| {
+            let d = t.descriptor();
+            let configured = cfg.send_targets.get(&d.id).map_or(false, |m| !m.is_empty());
+            SendTargetInfo {
+                descriptor: d,
+                schema: t.settings_schema(),
+                configured,
+            }
+        })
+        .collect())
+}
+
+#[tauri::command]
+pub async fn get_send_target_settings(
+    state: State<'_, AppState>,
+    target_id: String,
+) -> CmdResult<std::collections::HashMap<String, String>> {
+    let cfg = state.config.read().await;
+    Ok(cfg.send_targets.get(&target_id).cloned().unwrap_or_default())
+}
+
+#[tauri::command]
+pub async fn save_send_target_settings(
+    state: State<'_, AppState>,
+    target_id: String,
+    fields: std::collections::HashMap<String, String>,
+) -> CmdResult<()> {
+    {
+        let mut cfg = state.config.write().await;
+        cfg.send_targets.insert(target_id, fields);
+    }
+    state.save().await.map_err(err)
+}
+
+#[tauri::command]
+pub async fn send_book(state: State<'_, AppState>, request: SendRequest) -> CmdResult<SendResult> {
+    let target = state
+        .plugins
+        .find_send_target(&request.target_id)
+        .ok_or_else(|| format!("unknown send target: {}", request.target_id))?;
+    let fields = {
+        let cfg = state.config.read().await;
+        cfg.send_targets
+            .get(&request.target_id)
+            .cloned()
+            .unwrap_or_default()
+    };
+    let settings = SendTargetSettings { fields };
+    target.send(&request, &settings).await.map_err(err)
 }
 
 #[tauri::command]

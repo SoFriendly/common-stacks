@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
-import { api, type Acquisition, type Entry } from "../lib/api";
+import { api, type Acquisition, type Entry, type EnrichedMetadata } from "../lib/api";
 import { DefaultCover } from "../components/DefaultCover";
 
 /** State passed via navigation when clicking a cover. */
@@ -87,6 +87,7 @@ export function Book() {
   const [resolving, setResolving] = useState(false);
   const [resolveError, setResolveError] = useState<string | null>(null);
   const [downloadState, setDownloadState] = useState<DownloadState>({ kind: "idle" });
+  const [enrichment, setEnrichment] = useState<EnrichedMetadata | null>(null);
 
   // If the entry has no acquisitions but has a subsection link, follow it
   // to resolve the detail catalog (e.g. Gutenberg's per-book OPDS doc).
@@ -123,6 +124,40 @@ export function Book() {
       cancelled = true;
     };
   }, [state, entry]);
+
+  // Auto-enrich metadata in the background. Runs once per book mount.
+  useEffect(() => {
+    if (!state) return;
+    const initial = state.entry;
+    const isbn = pickIsbn(initial);
+    const title = initial.title;
+    if (!isbn && !title) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const enrichers = await api.listEnrichers();
+        for (const e of enrichers) {
+          const result = await api.enrichBook(e.id, {
+            isbn: isbn ?? undefined,
+            title,
+            authors: initial.authors,
+          });
+          if (cancelled) return;
+          if (result) {
+            setEnrichment(result);
+            setEntry((prev) => (prev ? applyEnrichment(prev, result) : prev));
+            return; // first usable result wins
+          }
+        }
+      } catch {
+        // silent — enrichment is best-effort.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state?.entry.id, state?.sourceId]);
 
   const acquisitions = useMemo(() => {
     if (!entry) return [];
@@ -288,10 +323,54 @@ export function Book() {
               <p className="leading-relaxed text-ink-soft">{entry.summary}</p>
             </div>
           )}
+
+          {enrichment && (
+            <div className="mt-8 text-[11px] text-ink-soft">
+              Enriched via {enrichment.source.replace(/^./, (c) => c.toUpperCase())}.
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
+}
+
+function pickIsbn(e: Entry): string | null {
+  const candidates = [e.id, ...e.identifiers];
+  for (const c of candidates) {
+    const cleaned = c.replace(/[-\s]/g, "");
+    const m = cleaned.match(/(97[89]\d{10})/);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+function applyEnrichment(entry: Entry, m: EnrichedMetadata): Entry {
+  const merged: Entry = {
+    ...entry,
+    summary: entry.summary ?? m.description,
+    language: entry.language ?? m.language,
+    published: entry.published ?? m.published,
+    cover: entry.cover ?? m.cover_url,
+    thumbnail: entry.thumbnail ?? m.cover_url,
+    categories: mergeStrings(entry.categories, m.subjects),
+    identifiers: mergeStrings(entry.identifiers, m.identifiers),
+    authors: entry.authors.length > 0 ? entry.authors : m.authors,
+  };
+  return merged;
+}
+
+function mergeStrings(a: string[], b: string[]): string[] {
+  const seen = new Set(a.map((s) => s.toLowerCase()));
+  const out = [...a];
+  for (const s of b) {
+    const key = s.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(s);
+    }
+  }
+  return out;
 }
 
 function mergeEntry(prev: Entry, next: Entry): Entry {

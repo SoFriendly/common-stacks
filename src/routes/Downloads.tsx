@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
-import { api, type DownloadedFile, type EpubMetadata } from "../lib/api";
+import {
+  api,
+  type DownloadedFile,
+  type EpubMetadata,
+  type SendTargetInfo,
+} from "../lib/api";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { DefaultCover } from "../components/DefaultCover";
 import { MoreHorizontal } from "lucide-react";
@@ -27,6 +32,11 @@ interface FileWithMeta {
 export function Downloads() {
   const [items, setItems] = useState<FileWithMeta[]>([]);
   const [view, setView] = useState<View>("grid");
+  const [sendTargets, setSendTargets] = useState<SendTargetInfo[]>([]);
+
+  useEffect(() => {
+    api.listSendTargets().then(setSendTargets);
+  }, []);
 
   async function refresh() {
     const files = await api.listDownloads();
@@ -93,6 +103,27 @@ export function Downloads() {
     refresh();
   }
 
+  async function handleSend(file: FileWithMeta, target: SendTargetInfo) {
+    if (!target.configured) {
+      if (window.confirm(`${target.descriptor.name} isn't configured. Open Settings now?`)) {
+        window.location.assign("/settings");
+      }
+      return;
+    }
+    try {
+      const r = await api.sendBook({
+        target_id: target.descriptor.id,
+        file_path: file.file.path,
+        title: file.meta?.title,
+        author: file.meta?.authors[0],
+      });
+      if (r.ok) window.alert(r.message);
+      else window.alert(`Send failed: ${r.message}`);
+    } catch (e) {
+      window.alert(`Send failed: ${e}`);
+    }
+  }
+
   return (
     <div className="px-10 pb-16">
       <BackLink />
@@ -131,10 +162,12 @@ export function Downloads() {
             <DownloadGridCard
               key={it.file.path}
               item={it}
+              sendTargets={sendTargets}
               onOpen={() => handleOpen(it.file.path)}
               onReveal={() => handleReveal(it.file.path)}
               onRename={() => handleRename(it.file)}
               onDelete={() => handleDelete(it.file.path)}
+              onSend={(target) => handleSend(it, target)}
             />
           ))}
         </div>
@@ -153,16 +186,20 @@ export function Downloads() {
 
 function DownloadGridCard({
   item,
+  sendTargets,
   onOpen,
   onReveal,
   onRename,
   onDelete,
+  onSend,
 }: {
   item: FileWithMeta;
+  sendTargets: SendTargetInfo[];
   onOpen: () => void;
   onReveal: () => void;
   onRename: () => void;
   onDelete: () => void;
+  onSend: (target: SendTargetInfo) => void;
 }) {
   const { file, meta } = item;
   const displayTitle = meta?.title ?? stripExt(file.name);
@@ -240,6 +277,20 @@ function DownloadGridCard({
               className="absolute right-0 z-30 mt-1 w-40 overflow-hidden rounded-md border border-shelf bg-paper shadow-lg ring-1 ring-black/10"
               onClick={(e) => e.stopPropagation()}
             >
+              {sendTargets.map((t) => (
+                <MenuItem
+                  key={t.descriptor.id}
+                  onClick={withClose(() => onSend(t))}
+                >
+                  Send to {t.descriptor.name.replace(/^Send to /, "")}
+                  {!t.configured && (
+                    <span className="ml-1 text-[10px] text-ink-soft">(setup)</span>
+                  )}
+                </MenuItem>
+              ))}
+              {sendTargets.length > 0 && (
+                <div className="my-1 border-t border-shelf" />
+              )}
               <MenuItem onClick={withClose(onReveal)}>Reveal in Finder</MenuItem>
               <MenuItem onClick={withClose(onRename)}>Rename…</MenuItem>
               <MenuItem onClick={withClose(onDelete)} danger>

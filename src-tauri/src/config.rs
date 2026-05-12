@@ -61,6 +61,9 @@ pub struct Config {
     pub sources: Vec<Source>,
     #[serde(default)]
     pub preferences: Preferences,
+    /// Per-send-target settings, keyed by target id (e.g. "kindle-email").
+    #[serde(default)]
+    pub send_targets: std::collections::HashMap<String, std::collections::HashMap<String, String>>,
 }
 
 pub fn config_dir() -> PathBuf {
@@ -107,6 +110,7 @@ pub fn load_or_seed() -> Config {
             },
         ],
         preferences: Preferences::default(),
+        send_targets: Default::default(),
     };
     let _ = save(&seeded);
     seeded

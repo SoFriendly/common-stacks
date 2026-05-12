@@ -1,11 +1,13 @@
 use crate::config::{self, Config, Source};
 use crate::opds::OpdsClient;
+use crate::plugins::PluginRegistry;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 pub struct AppState {
     pub config: Arc<RwLock<Config>>,
     pub client: Arc<OpdsClient>,
+    pub plugins: Arc<PluginRegistry>,
 }
 
 impl AppState {
@@ -14,6 +16,7 @@ impl AppState {
         Self {
             config: Arc::new(RwLock::new(config)),
             client: Arc::new(OpdsClient::new()),
+            plugins: Arc::new(PluginRegistry::new()),
         }
     }
 
