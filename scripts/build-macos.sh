@@ -1,14 +1,18 @@
 #!/bin/bash
 set -e
 
-# Usage: ./scripts/build-macos.sh [major|minor|patch|<version>|--no-bump]
+# Usage: ./scripts/build-macos.sh [major|minor|patch|<version>|--no-bump] [--upload]
 #
 # Builds a signed + notarized macOS bundle and the updater .app.tar.gz + .sig.
+# Pass --upload to also push artifacts to R2 + merge latest.json when the build
+# finishes.
+#
 # Requires the following env (place them in .env.local):
 #   TAURI_SIGNING_PRIVATE_KEY        (or _PATH)   minisign private key for updater
 #   TAURI_SIGNING_PRIVATE_KEY_PASSWORD
 #   APPLE_SIGNING_IDENTITY            "Developer ID Application: ..." (codesign)
 #   APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID       (notarytool)
+#   CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_R2_ACCESS_KEY, CLOUDFLARE_R2_SECRET_KEY  (only if --upload)
 #
 # Notarization is skipped automatically if Apple creds are unset.
 
@@ -16,7 +20,24 @@ if [ -f .env.local ]; then
   set -a; . ./.env.local; set +a
 fi
 
-BUMP=${1:---no-bump}
+UPLOAD=0
+BUMP=--no-bump
+for arg in "$@"; do
+  case "$arg" in
+    --upload) UPLOAD=1 ;;
+    major|minor|patch|--no-bump) BUMP=$arg ;;
+    *)
+      if [[ "$arg" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        BUMP=$arg
+      else
+        echo "Unknown argument: $arg"
+        echo "Usage: ./scripts/build-macos.sh [major|minor|patch|<version>|--no-bump] [--upload]"
+        exit 1
+      fi
+      ;;
+  esac
+done
+
 if [ "$BUMP" != "--no-bump" ]; then
   ./scripts/bump-version.sh "$BUMP" >/dev/null
 fi
@@ -73,3 +94,9 @@ else
 fi
 
 echo "macOS build complete: $DMG"
+
+if [ "$UPLOAD" = "1" ]; then
+  echo ""
+  echo "=== Uploading to Cloudflare R2 ==="
+  ./scripts/upload-to-cloudflare.sh
+fi
