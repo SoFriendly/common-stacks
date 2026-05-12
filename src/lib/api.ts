@@ -97,6 +97,14 @@ export interface PluginDescriptor {
   description: string;
 }
 
+export type PluginCategory = "metadata" | "send" | "transformer";
+
+export interface InstalledPlugin {
+  category: PluginCategory;
+  descriptor: PluginDescriptor;
+  source: "builtin" | "user";
+}
+
 export interface EnrichQuery {
   isbn?: string;
   title?: string;
@@ -206,6 +214,7 @@ export const api = {
   exportConfig: () => invoke<string>("export_config"),
   importConfig: (json: string) => invoke<void>("import_config", { json }),
 
+  listPlugins: () => invoke<InstalledPlugin[]>("list_plugins"),
   listEnrichers: () => invoke<PluginDescriptor[]>("list_enrichers"),
   enrichBook: (enricherId: string, query: EnrichQuery) =>
     invoke<EnrichedMetadata | null>("enrich_book", { enricherId, query }),

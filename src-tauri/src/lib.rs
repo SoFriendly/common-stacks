@@ -44,6 +44,7 @@ pub fn run() {
             commands::set_download_dir,
             commands::export_config,
             commands::import_config,
+            commands::list_plugins,
             commands::list_enrichers,
             commands::enrich_book,
             commands::list_send_targets,

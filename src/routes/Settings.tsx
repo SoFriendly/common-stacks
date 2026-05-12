@@ -3,13 +3,15 @@ import { Link } from "react-router";
 import {
   api,
   type AuthConfig,
+  type InstalledPlugin,
+  type PluginCategory,
   type SendTargetInfo,
   type SettingField,
   type Source,
   type ValidateResult,
 } from "../lib/api";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Puzzle } from "lucide-react";
 
 export function Settings() {
   const [sources, setSources] = useState<Source[]>([]);
@@ -283,6 +285,14 @@ export function Settings() {
       </section>
 
       <section className="mb-12 max-w-2xl">
+        <h2 className="mb-3 font-display text-xl">Plugins</h2>
+        <p className="mb-3 text-xs text-ink-soft">
+          Plugins extend CommonStacks with new metadata sources, send-to targets, and EPUB transformers.
+        </p>
+        <PluginsPanel />
+      </section>
+
+      <section className="mb-12 max-w-2xl">
         <h2 className="mb-3 font-display text-xl">Send-to targets</h2>
         <p className="mb-3 text-xs text-ink-soft">
           Configure where downloaded books can be delivered (Kindle, WebDAV).
@@ -519,5 +529,91 @@ function Toggle({
         }`}
       />
     </button>
+  );
+}
+
+function PluginsPanel() {
+  const [plugins, setPlugins] = useState<InstalledPlugin[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api
+      .listPlugins()
+      .then((p) => setPlugins(p))
+      .finally(() => setLoading(false));
+  }, []);
+
+  function handleInstall() {
+    window.alert(
+      "Loading third-party plugins isn't available yet. The trait surface is in place; a dynamic loader (Rust dylib or WASM) is planned.",
+    );
+  }
+
+  const groups: { key: PluginCategory; label: string; help: string }[] = [
+    { key: "metadata", label: "Metadata enrichers", help: "Augment book metadata from external sources." },
+    { key: "send", label: "Send-to targets", help: "Deliver downloaded books to other devices or services." },
+    { key: "transformer", label: "Transformers", help: "Process files before they're sent (e.g. EPUB image optimizer)." },
+  ];
+
+  return (
+    <div>
+      <div className="mb-3 flex items-center justify-between">
+        <div className="text-xs text-ink-soft">
+          {loading ? "Loading…" : `${plugins.length} installed`}
+        </div>
+        <button
+          onClick={handleInstall}
+          className="rounded-md border border-shelf bg-white px-3 py-1.5 text-sm hover:bg-shelf"
+        >
+          Install plugin…
+        </button>
+      </div>
+
+      <div className="space-y-5">
+        {groups.map((g) => {
+          const items = plugins.filter((p) => p.category === g.key);
+          return (
+            <div key={g.key}>
+              <div className="mb-1 flex items-baseline justify-between">
+                <div className="font-display text-sm tracking-tight text-ink">
+                  {g.label}
+                </div>
+                <div className="text-[10px] uppercase tracking-wider text-ink-soft">
+                  {items.length}
+                </div>
+              </div>
+              <div className="mb-1 text-[11px] text-ink-soft">{g.help}</div>
+              <div className="overflow-hidden rounded-lg border border-shelf">
+                {items.length === 0 && !loading && (
+                  <div className="p-3 text-xs text-ink-soft">None installed.</div>
+                )}
+                {items.map((p) => (
+                  <div
+                    key={`${p.category}:${p.descriptor.id}`}
+                    className="flex items-start gap-3 border-b border-shelf px-3 py-2.5 last:border-b-0"
+                  >
+                    <Puzzle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-soft" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline gap-2">
+                        <div className="font-display text-sm">{p.descriptor.name}</div>
+                        <code className="text-[10px] text-ink-soft">
+                          {p.descriptor.id}
+                        </code>
+                      </div>
+                      <div className="text-[11px] text-ink-soft leading-snug">
+                        {p.descriptor.description}
+                      </div>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-shelf px-2 py-0.5 text-[10px] uppercase tracking-wider text-ink-soft">
+                      {p.source === "builtin" ? "Built-in" : "User"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

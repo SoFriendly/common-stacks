@@ -345,6 +345,40 @@ pub async fn export_config(state: State<'_, AppState>) -> CmdResult<String> {
 // ============================================================================
 
 #[derive(serde::Serialize)]
+pub struct InstalledPlugin {
+    pub category: &'static str, // "metadata" | "send" | "transformer"
+    pub descriptor: PluginDescriptor,
+    pub source: &'static str, // "builtin" — reserved for future "user" plugins
+}
+
+#[tauri::command]
+pub async fn list_plugins(state: State<'_, AppState>) -> CmdResult<Vec<InstalledPlugin>> {
+    let mut out = Vec::new();
+    for p in state.plugins.enrichers() {
+        out.push(InstalledPlugin {
+            category: "metadata",
+            descriptor: p.descriptor(),
+            source: "builtin",
+        });
+    }
+    for p in state.plugins.send_targets() {
+        out.push(InstalledPlugin {
+            category: "send",
+            descriptor: p.descriptor(),
+            source: "builtin",
+        });
+    }
+    for p in state.plugins.transformers() {
+        out.push(InstalledPlugin {
+            category: "transformer",
+            descriptor: p.descriptor(),
+            source: "builtin",
+        });
+    }
+    Ok(out)
+}
+
+#[derive(serde::Serialize)]
 pub struct SendTargetInfo {
     pub descriptor: PluginDescriptor,
     pub schema: Vec<SettingField>,
