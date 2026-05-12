@@ -113,14 +113,14 @@ function Hero() {
           </p>
           <div id="download" className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <a
-              href="https://github.com/jmitch/common-stacks/releases/latest"
+              href="https://github.com/SoFriendly/common-stacks/releases/latest"
               className="inline-flex items-center gap-2 rounded-md bg-ink px-5 py-2.5 text-sm text-paper transition-opacity hover:opacity-90"
             >
               <Download className="h-4 w-4" />
               Download for macOS
             </a>
             <a
-              href="https://github.com/jmitch/common-stacks"
+              href="https://github.com/SoFriendly/common-stacks"
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-2 rounded-md border border-shelf bg-paper px-5 py-2.5 text-sm text-ink transition-colors hover:bg-shelf"
@@ -448,7 +448,7 @@ function Plugins() {
             </p>
           </div>
           <a
-            href="https://github.com/jmitch/common-stacks/blob/main/docs/PLUGIN_DEVELOPMENT.md"
+            href="https://github.com/SoFriendly/common-stacks/blob/main/docs/PLUGIN_DEVELOPMENT.md"
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center justify-center gap-2 rounded-md border border-shelf bg-paper px-4 py-2 text-sm text-ink transition-colors hover:bg-shelf"
@@ -508,7 +508,7 @@ function Footer() {
         </div>
         <div className="flex items-center gap-5">
           <a
-            href="https://github.com/jmitch/common-stacks"
+            href="https://github.com/SoFriendly/common-stacks"
             target="_blank"
             rel="noreferrer"
             className="hover:text-ink"
