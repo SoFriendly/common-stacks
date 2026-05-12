@@ -62,13 +62,36 @@ impl OpdsClient {
     }
 
     pub async fn search(&self, source: &Source, query: &str) -> Result<Feed> {
-        // Best-effort: discover the search template from the source root.
         let root = self.fetch_feed(source, &source.url).await?;
-        let template = root.search_template.clone().ok_or_else(|| {
-            anyhow!("source `{}` does not advertise an OpenSearch endpoint", source.name)
+        let template_url = root.search_template.clone().ok_or_else(|| {
+            anyhow!("source `{}` does not advertise a search endpoint", source.name)
         })?;
+        let template = self
+            .resolve_search_template(source, &template_url)
+            .await?;
         let url = template.replace("{searchTerms}", &urlencoding(query));
         self.fetch_feed(source, &url).await
+    }
+
+    /// Many catalogs advertise search via an OpenSearch Description Document
+    /// (OSDD) at `rel="search"` rather than a direct templated URL. If the
+    /// pointed-to URL contains "{searchTerms}" we use it directly; otherwise
+    /// we fetch it, parse the OSDD, and pull out the atom+xml Url template.
+    async fn resolve_search_template(
+        &self,
+        source: &Source,
+        template_or_osdd: &str,
+    ) -> Result<String> {
+        if template_or_osdd.contains("{searchTerms}") {
+            return Ok(template_or_osdd.to_string());
+        }
+        let mut req = self.http.get(template_or_osdd);
+        req = auth::apply(req, &source.auth);
+        let resp = req.send().await?.error_for_status()?;
+        let body = resp.text().await?;
+        let resolved = parse_osdd(&body, template_or_osdd)
+            .ok_or_else(|| anyhow!("could not parse OpenSearch description from {}", template_or_osdd))?;
+        Ok(resolved)
     }
 
     pub async fn download(
@@ -105,6 +128,88 @@ impl OpdsClient {
         let bytes = resp.bytes().await?;
         Ok((bytes.to_vec(), ct))
     }
+}
+
+/// Parse an OpenSearch Description Document and return the best atom/opds
+/// search URL template. Returns None if no usable template is found.
+fn parse_osdd(xml: &str, base_url: &str) -> Option<String> {
+    use quick_xml::events::Event;
+    use quick_xml::Reader;
+
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+
+    // (priority, template)
+    let mut best: Option<(u8, String)> = None;
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Eof) | Err(_) => break,
+            Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+                let name = e.name();
+                let local = name
+                    .as_ref()
+                    .rsplit(|b| *b == b':')
+                    .next()
+                    .unwrap_or(name.as_ref());
+                if local != b"Url" {
+                    continue;
+                }
+                let mut tpl: Option<String> = None;
+                let mut ty = String::new();
+                let mut rel = String::new();
+                for a in e.attributes().flatten() {
+                    let k = a.key.as_ref();
+                    let key = k
+                        .rsplit(|b| *b == b':')
+                        .next()
+                        .unwrap_or(k);
+                    let v = a
+                        .unescape_value()
+                        .map(|c| c.into_owned())
+                        .unwrap_or_else(|_| String::from_utf8_lossy(&a.value).into_owned());
+                    match key {
+                        b"template" => tpl = Some(v),
+                        b"type" => ty = v,
+                        b"rel" => rel = v,
+                        _ => {}
+                    }
+                }
+                let Some(tpl) = tpl else { continue };
+                if rel.eq_ignore_ascii_case("suggestions") || rel.eq_ignore_ascii_case("self") {
+                    continue;
+                }
+                // Prefer OPDS-flavored atom feeds; then plain atom; then anything.
+                let prio = if ty.contains("opds-catalog") {
+                    0
+                } else if ty.contains("atom+xml") {
+                    1
+                } else if ty.is_empty() {
+                    2
+                } else if ty.contains("html") {
+                    9 // last resort — we can't parse HTML results
+                } else {
+                    3
+                };
+                let absolute = resolve_url(base_url, &tpl);
+                if best.as_ref().map_or(true, |(p, _)| prio < *p) {
+                    best = Some((prio, absolute));
+                }
+            }
+            _ => {}
+        }
+        buf.clear();
+    }
+    best.map(|(_, t)| t)
+}
+
+fn resolve_url(base: &str, href: &str) -> String {
+    if let Ok(b) = url::Url::parse(base) {
+        if let Ok(joined) = b.join(href) {
+            return joined.to_string();
+        }
+    }
+    href.to_string()
 }
 
 fn urlencoding(s: &str) -> String {
