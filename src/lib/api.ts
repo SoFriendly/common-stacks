@@ -203,6 +203,7 @@ export const api = {
 
   listDownloads: () => invoke<DownloadedFile[]>("list_downloads"),
   inspectDownload: (path: string) => invoke<EpubMetadata>("inspect_download", { path }),
+  openDownload: (path: string) => invoke<void>("open_download", { path }),
   revealDownload: (path: string) => invoke<void>("reveal_download", { path }),
   deleteDownload: (path: string) => invoke<void>("delete_download", { path }),
   renameDownload: (path: string, newName: string) =>
@@ -230,6 +231,11 @@ export const api = {
     invoke<void>("save_send_target_settings", { targetId, fields }),
   setSendTargetEnabled: (targetId: string, enabled: boolean) =>
     invoke<void>("set_send_target_enabled", { targetId, enabled }),
+  fetchKindleRelayInfo: (sendUrl: string) =>
+    invoke<{ sender_email: string; sender_name?: string }>(
+      "fetch_kindle_relay_info",
+      { sendUrl },
+    ),
   sendBook: (request: SendRequest, onProgress?: (p: SendProgress) => void) => {
     const channel = new Channel<SendProgress>();
     if (onProgress) channel.onmessage = onProgress;

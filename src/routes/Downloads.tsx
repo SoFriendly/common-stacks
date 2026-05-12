@@ -5,15 +5,15 @@ import {
   type EpubMetadata,
   type SendTargetInfo,
 } from "../lib/api";
-import { openPath } from "@tauri-apps/plugin-opener";
 import { DefaultCover } from "../components/DefaultCover";
 import { MoreHorizontal, Settings as SettingsIcon } from "lucide-react";
 import { ViewToggle } from "../components/ViewToggle";
-import { NavLink } from "react-router";
+import { NavLink, useNavigate } from "react-router";
 import {
   SendProgressModal,
   type SendModalState,
 } from "../components/SendProgressModal";
+import { EmptyState } from "../components/EmptyState";
 
 type View = "grid" | "list";
 
@@ -28,6 +28,7 @@ export function Downloads() {
   const [view, setView] = useState<View>("grid");
   const [sendTargets, setSendTargets] = useState<SendTargetInfo[]>([]);
   const [sendModal, setSendModal] = useState<SendModalState | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     api.listSendTargets().then(setSendTargets);
@@ -64,7 +65,7 @@ export function Downloads() {
 
   async function handleOpen(path: string) {
     try {
-      await openPath(path);
+      await api.openDownload(path);
     } catch (e) {
       window.alert(`Open failed: ${e}`);
     }
@@ -160,7 +161,7 @@ export function Downloads() {
   }
 
   return (
-    <div className="px-10 pb-16">
+    <div className="px-6 pb-16">
       <SendProgressModal state={sendModal} onClose={() => setSendModal(null)} />
       <header className="mb-6 flex items-center justify-between gap-6">
         <ViewToggle />
@@ -195,7 +196,16 @@ export function Downloads() {
       </header>
 
       {items.length === 0 ? (
-        <p className="text-sm text-ink-soft">Nothing downloaded yet.</p>
+        <EmptyState
+          title="No books here yet"
+          description={
+            <>
+              Downloaded books land in your Common Stacks folder. Browse a
+              library, open a book, and pick a format to start your shelf.
+            </>
+          }
+          primary={{ label: "Browse the library", onClick: () => navigate("/library") }}
+        />
       ) : view === "grid" ? (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-x-5 gap-y-10">
           {items.map((it) => (

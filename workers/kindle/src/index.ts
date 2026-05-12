@@ -47,6 +47,19 @@ export default {
     if (request.method === "GET" && url.pathname === "/healthz") {
       return json({ ok: true, message: "alive" });
     }
+    if (request.method === "GET" && url.pathname === "/info") {
+      // Public info every caller is allowed to know — the sender address the
+      // user needs to whitelist in Amazon's Approved Personal Document list.
+      return jsonRaw(
+        {
+          sender_email: env.SENDER_EMAIL,
+          sender_name: env.SENDER_NAME ?? "Common Stacks",
+        },
+        200,
+        // Cache for an hour at the edge; the value rarely changes.
+        { "cache-control": "public, max-age=3600" },
+      );
+    }
     if (request.method !== "POST" || url.pathname !== "/send") {
       return json({ ok: false, message: "not found" }, 404);
     }
@@ -71,10 +84,16 @@ export default {
     const subject = formatSubject(payload);
     const fromEmail = env.SENDER_EMAIL;
     const fromName = env.SENDER_NAME ?? "Common Stacks";
+    // Cloudflare Email Service accepts `from` as either a raw RFC 5322
+    // mailbox string ("Name <addr>") or an object with `address` + `name`
+    // keys. Sticking with the string form to keep the schema unambiguous.
+    const fromHeader = fromName
+      ? `${fromName} <${fromEmail}>`
+      : fromEmail;
 
     const cfBody = {
       to: payload.kindle_address,
-      from: { email: fromEmail, name: fromName },
+      from: fromHeader,
       subject,
       text: "Sent via Common Stacks.",
       attachments: [
@@ -99,17 +118,64 @@ export default {
       },
     );
 
+    const cfText = await cfRes.text();
+    // Always log so we can confirm what Cloudflare actually said. The
+    // success envelope looks like `{success: true, result: {...}}`.
+    console.log("cloudflare email response", cfRes.status, truncate(cfText, 400));
+
     if (cfRes.ok) {
+      try {
+        const parsed = JSON.parse(cfText);
+        if (parsed && parsed.success === false) {
+          console.error("cloudflare reported success=false", cfText);
+          return json(
+            {
+              ok: false,
+              message: `Cloudflare Email Service rejected the message: ${truncate(
+                cfText,
+                400,
+              )}`,
+            },
+            502,
+          );
+        }
+        // `success: true` can still mean "accepted but went nowhere" when
+        // the sending domain isn't fully verified. Treat empty delivered +
+        // empty queued as a real failure so the user sees something.
+        const result = parsed?.result ?? {};
+        const delivered = Array.isArray(result.delivered) ? result.delivered : [];
+        const queued = Array.isArray(result.queued) ? result.queued : [];
+        const bounces = Array.isArray(result.permanent_bounces)
+          ? result.permanent_bounces
+          : [];
+        if (delivered.length === 0 && queued.length === 0) {
+          console.error("cloudflare accepted but didn't send", cfText);
+          return json(
+            {
+              ok: false,
+              message:
+                bounces.length > 0
+                  ? `Amazon rejected the message: ${JSON.stringify(bounces).slice(
+                      0,
+                      400,
+                    )}`
+                  : "Cloudflare Email Service accepted the request but didn't deliver or queue it. The sending domain is most likely not fully verified — check DKIM/SPF/DMARC in the Cloudflare dashboard's Email Sending settings.",
+            },
+            502,
+          );
+        }
+      } catch {
+        // body isn't json — fine, the 2xx status alone is enough
+      }
       return json({ ok: true, message: `sent to ${payload.kindle_address}` });
     }
 
-    const errText = await cfRes.text();
-    console.error("cloudflare email send failed", cfRes.status, errText);
+    console.error("cloudflare email send failed", cfRes.status, cfText);
     return json(
       {
         ok: false,
         message: `Cloudflare Email Service returned ${cfRes.status}: ${truncate(
-          errText,
+          cfText,
           400,
         )}`,
       },
@@ -149,5 +215,20 @@ function json(payload: SendResponse, status = 200): Response {
   return new Response(JSON.stringify(payload), {
     status,
     headers: { "content-type": "application/json" },
+  });
+}
+
+function jsonRaw(
+  body: unknown,
+  status = 200,
+  extraHeaders: Record<string, string> = {},
+): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      ...extraHeaders,
+    },
   });
 }

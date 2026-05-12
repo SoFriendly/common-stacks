@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { api, type Acquisition, type Entry, type EnrichedMetadata } from "../lib/api";
 import { DefaultCover } from "../components/DefaultCover";
-import { set as cacheEnrichment, applyToEntry } from "../lib/enrichment";
+import { set as cacheEnrichment, applyToEntry, get as getCachedEnrichment, ensureLoaded as ensureEnrichmentLoaded } from "../lib/enrichment";
 
 /** State passed via navigation when clicking a cover. */
 export interface BookNavState {
@@ -126,7 +126,9 @@ export function Book() {
     };
   }, [state, entry]);
 
-  // Auto-enrich metadata in the background. Runs once per book mount.
+  // Auto-enrich metadata in the background. Runs once per book mount, but
+  // short-circuits if we already have cached enrichment for this book —
+  // avoids hitting Open Library every visit, which can be slow.
   useEffect(() => {
     if (!state) return;
     const initial = state.entry;
@@ -135,6 +137,17 @@ export function Book() {
     if (!isbn && !title) return;
     let cancelled = false;
     (async () => {
+      // Make sure the disk-backed cache is hydrated before the cache lookup.
+      await ensureEnrichmentLoaded();
+      if (cancelled) return;
+      // If we've enriched this book before, apply directly and skip the
+      // network round-trip entirely.
+      const cached = getCachedEnrichment(initial);
+      if (cached) {
+        setEnrichment(cached);
+        setEntry((prev) => (prev ? applyToEntry(prev, cached) : prev));
+        return;
+      }
       try {
         const enrichers = await api.listEnrichers();
         for (const e of enrichers) {
@@ -205,6 +218,15 @@ export function Book() {
   }
 
   const cover = entry.cover ?? entry.thumbnail;
+  type CoverLoadState = "loading" | "real" | "failed";
+  const [coverState, setCoverState] = useState<CoverLoadState>(
+    cover ? "loading" : "failed",
+  );
+  // Reset whenever the URL changes — otherwise a prior failure / successful
+  // load would carry over and either hide or stale-show the new image.
+  useEffect(() => {
+    setCoverState(cover ? "loading" : "failed");
+  }, [cover]);
 
   return (
     <div className="mx-auto max-w-5xl px-10 pb-20">
@@ -217,29 +239,29 @@ export function Book() {
 
       <div className="flex flex-col gap-10 md:flex-row">
         <div className="shrink-0">
-          <div className="aspect-[2/3] w-56 overflow-hidden rounded-md bg-shelf shadow-lg ring-1 ring-black/5">
-            {cover ? (
+          <div className="relative aspect-[2/3] w-56 overflow-hidden rounded-md bg-shelf shadow-lg ring-1 ring-black/5">
+            <DefaultCover
+              title={entry.title}
+              author={entry.authors[0]}
+              className="absolute inset-0 h-full w-full"
+            />
+            {cover && coverState !== "failed" && (
               <img
                 src={cover}
                 alt={entry.title}
-                className="h-full w-full object-cover"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).style.display = "none";
-                  const fallback = e.currentTarget.nextElementSibling;
-                  if (fallback) (fallback as HTMLElement).style.display = "block";
+                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${
+                  coverState === "real" ? "opacity-100" : "opacity-0"
+                }`}
+                onLoad={(e) => {
+                  const w = e.currentTarget.naturalWidth;
+                  // Treat anything smaller than ~96px as a placeholder /
+                  // missing-cover image (Open Library serves a tiny GIF for
+                  // unknown books). Falling back to DefaultCover is nicer.
+                  setCoverState(w > 0 && w < 96 ? "failed" : "real");
                 }}
+                onError={() => setCoverState("failed")}
               />
-            ) : null}
-            <div
-              style={{ display: cover ? "none" : "block" }}
-              className="h-full w-full"
-            >
-              <DefaultCover
-                title={entry.title}
-                author={entry.authors[0]}
-                className="h-full w-full"
-              />
-            </div>
+            )}
           </div>
         </div>
 

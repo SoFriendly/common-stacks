@@ -13,6 +13,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { ViewToggle } from "../components/ViewToggle";
+import { EmptyState } from "../components/EmptyState";
 
 type RailContent =
   | { kind: "entries"; entries: Entry[] }
@@ -146,7 +147,7 @@ export function Library() {
                           key: `${source.id}:root`,
                           title: feed.title || source.name,
                           href: source.url,
-                          content: { kind: "entries", entries: feed.entries.map(applyEnrichmentToEntry) },
+                          content: { kind: "entries", entries: feed.entries },
                           loading: false,
                         },
                       ],
@@ -196,7 +197,7 @@ export function Library() {
                 const { feed: sf } = await api.fetchFeed(source.id, sub.href);
                 const content: RailContent =
                   sf.entries.length > 0
-                    ? { kind: "entries", entries: sf.entries.map(applyEnrichmentToEntry) }
+                    ? { kind: "entries", entries: sf.entries }
                     : {
                         kind: "categories",
                         links: pickSubsections(sf.navigation).slice(
@@ -273,7 +274,7 @@ export function Library() {
   const showingSearch = searchResult !== null || searching;
 
   return (
-    <div className="px-10 pb-16">
+    <div className="px-6 pb-16">
       <header className="mb-8 flex items-center justify-between gap-6">
         <ViewToggle />
         <form
@@ -331,7 +332,20 @@ export function Library() {
       ) : (
         <>
           {blocks.length === 0 && (
-            <p className="text-sm text-ink-soft">No sources configured yet.</p>
+            <EmptyState
+              title="Your shelves are empty"
+              description={
+                <>
+                  Add an OPDS library in Settings and you'll see books here.
+                  Mayberry and Project Gutenberg ship pre-configured if you'd
+                  like to start there.
+                </>
+              }
+              primary={{
+                label: "Open Settings",
+                onClick: () => navigate("/settings"),
+              }}
+            />
           )}
           {blocks.map((b) => (
         <section key={b.source.id} className="mb-12">
@@ -379,9 +393,12 @@ export function Library() {
                 ))}
 
               {!rail.loading && rail.content?.kind === "entries" &&
-                rail.content.entries
-                  .slice(0, 24)
-                  .map((e) => (
+                rail.content.entries.slice(0, 24).map((raw) => {
+                  // Apply cached enrichment at render time so books that get
+                  // enriched after the Library rail was fetched still surface
+                  // the new cover/author data without waiting for a refresh.
+                  const e = applyEnrichmentToEntry(raw);
+                  return (
                     <CoverCard
                       key={`${rail.key}:${e.id}`}
                       title={e.title}
@@ -395,7 +412,8 @@ export function Library() {
                         })
                       }
                     />
-                  ))}
+                  );
+                })}
 
               {!rail.loading && rail.content?.kind === "categories" &&
                 rail.content.links.map((l, i) => (
@@ -467,15 +485,25 @@ function SearchResultsView({
   if (!result) return null;
   return (
     <>
-      <div className="mb-4 flex items-center gap-3 text-sm text-ink-soft">
-        <span>
-          {result.merged.length} {result.merged.length === 1 ? "result" : "results"} for
-          <span className="ml-1 font-display italic text-ink">"{query}"</span>
-        </span>
-      </div>
       {result.merged.length === 0 ? (
-        <p className="text-sm text-ink-soft">No results.</p>
+        <EmptyState
+          title="No matches"
+          description={
+            <>
+              Nothing in your libraries matches{" "}
+              <span className="font-display italic text-ink">"{query}"</span>.
+              Try a different title, author, or ISBN.
+            </>
+          }
+        />
       ) : (
+        <>
+        <div className="mb-4 flex items-center gap-3 text-sm text-ink-soft">
+          <span>
+            {result.merged.length} {result.merged.length === 1 ? "result" : "results"} for
+            <span className="ml-1 font-display italic text-ink">"{query}"</span>
+          </span>
+        </div>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-x-5 gap-y-8">
           {result.merged.map((b) => {
             const enriched = applyEnrichmentToEntry(mergedBookAsEntry(b));
@@ -496,6 +524,7 @@ function SearchResultsView({
             );
           })}
         </div>
+        </>
       )}
       {result.errors.length > 0 && (
         <div className="mt-6 text-xs text-ink-soft">

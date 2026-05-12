@@ -39,6 +39,7 @@ pub fn run() {
             commands::download_book,
             commands::list_downloads,
             commands::inspect_download,
+            commands::open_download,
             commands::reveal_download,
             commands::delete_download,
             commands::rename_download,
@@ -48,6 +49,8 @@ pub fn run() {
             commands::export_config_to_path,
             commands::import_config,
             commands::import_config_from_path,
+            commands::read_enrichment_cache,
+            commands::write_enrichment_cache,
             commands::list_plugins,
             commands::plugins_dir,
             commands::reveal_plugins_dir,
@@ -58,6 +61,7 @@ pub fn run() {
             commands::save_send_target_settings,
             commands::set_send_target_enabled,
             commands::send_book,
+            commands::fetch_kindle_relay_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

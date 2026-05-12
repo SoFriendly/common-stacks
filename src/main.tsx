@@ -4,6 +4,12 @@ import { BrowserRouter } from "react-router";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import App from "./App";
 import "./styles.css";
+import { ensureLoaded as ensureEnrichmentLoaded } from "./lib/enrichment";
+
+// Kick off the persistent enrichment cache load in parallel with React mount.
+// `get()` returns localStorage-only data synchronously until the disk read
+// completes; the disk file is canonical and overrides anything older.
+void ensureEnrichmentLoaded();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

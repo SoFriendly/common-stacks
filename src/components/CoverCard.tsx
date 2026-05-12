@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "../lib/utils";
 import { DefaultCover } from "./DefaultCover";
 
@@ -22,6 +22,16 @@ export function CoverCard({ title, authors, cover, className, onClick }: Props) 
   const [state, setState] = useState<CoverState>(
     cover ? { kind: "loading" } : { kind: "failed" },
   );
+  // Reset the load state whenever the cover URL changes — otherwise once we
+  // hit "failed" or "icon" the component permanently skips rendering the
+  // <img>, so a later enrichment can never recover from a broken thumbnail.
+  const lastCoverRef = useRef<string | undefined>(cover);
+  useEffect(() => {
+    if (lastCoverRef.current === cover) return;
+    lastCoverRef.current = cover;
+    setState(cover ? { kind: "loading" } : { kind: "failed" });
+  }, [cover]);
+
   const author = authors?.[0];
 
   return (

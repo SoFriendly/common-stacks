@@ -63,7 +63,7 @@ export function Browse() {
     }) ?? [];
 
   return (
-    <div className="px-10 pb-16">
+    <div className="px-6 pb-16">
       <button
         onClick={() => navigate(-1)}
         className="mb-4 text-xs text-ink-soft hover:text-ink"

@@ -279,6 +279,38 @@ pub fn inspect_download(path: String) -> CmdResult<crate::epub::EpubMetadata> {
 }
 
 #[tauri::command]
+pub fn open_download(path: String) -> CmdResult<()> {
+    let p = std::path::PathBuf::from(&path);
+    if !p.exists() {
+        return Err(format!("file not found: {}", path));
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&path)
+            .spawn()
+            .map_err(err)?;
+        return Ok(());
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "", &path])
+            .spawn()
+            .map_err(err)?;
+        return Ok(());
+    }
+    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&path)
+            .spawn()
+            .map_err(err)?;
+        Ok(())
+    }
+}
+
+#[tauri::command]
 pub fn reveal_download(path: String) -> CmdResult<()> {
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     let p = std::path::PathBuf::from(&path);
@@ -348,6 +380,31 @@ pub async fn export_config_to_path(
     let cfg: Config = state.config.read().await.clone();
     let json = serde_json::to_string_pretty(&cfg).map_err(err)?;
     std::fs::write(&path, json).map_err(err)
+}
+
+// ---------------------------------------------------------------------------
+// Enrichment cache (mirrors what the WebView keeps in localStorage, but
+// canonical on disk so it survives WebView profile resets between launches).
+// ---------------------------------------------------------------------------
+
+fn enrichment_path() -> std::path::PathBuf {
+    crate::config::config_dir().join("enrichment.json")
+}
+
+#[tauri::command]
+pub fn read_enrichment_cache() -> CmdResult<String> {
+    let path = enrichment_path();
+    if !path.exists() {
+        return Ok(String::new());
+    }
+    std::fs::read_to_string(&path).map_err(err)
+}
+
+#[tauri::command]
+pub fn write_enrichment_cache(contents: String) -> CmdResult<()> {
+    let dir = crate::config::config_dir();
+    std::fs::create_dir_all(&dir).map_err(err)?;
+    std::fs::write(enrichment_path(), contents).map_err(err)
 }
 
 #[tauri::command]
@@ -535,6 +592,43 @@ pub async fn set_send_target_enabled(
         cfg.send_target_enabled.insert(target_id, enabled);
     }
     state.save().await.map_err(err)
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct RelayInfo {
+    pub sender_email: String,
+    #[serde(default)]
+    pub sender_name: Option<String>,
+}
+
+#[tauri::command]
+pub async fn fetch_kindle_relay_info(send_url: String) -> CmdResult<RelayInfo> {
+    // Derive /info from /send so callers don't have to.
+    let info_url = if let Ok(mut u) = url::Url::parse(&send_url) {
+        let path = u.path().trim_end_matches('/');
+        let new_path = if let Some(stripped) = path.strip_suffix("/send") {
+            format!("{}/info", stripped)
+        } else {
+            format!("{}/info", path)
+        };
+        u.set_path(&new_path);
+        u.set_query(None);
+        u.to_string()
+    } else {
+        return Err("invalid relay URL".into());
+    };
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .user_agent("Common Stacks/0.1")
+        .hickory_dns(true)
+        .build()
+        .map_err(err)?;
+    let resp = client.get(&info_url).send().await.map_err(err)?;
+    if !resp.status().is_success() {
+        return Err(format!("relay returned HTTP {}", resp.status()));
+    }
+    resp.json::<RelayInfo>().await.map_err(err)
 }
 
 #[tauri::command]

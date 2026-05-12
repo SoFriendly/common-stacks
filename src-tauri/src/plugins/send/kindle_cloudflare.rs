@@ -68,18 +68,6 @@ impl SendTarget for KindleCloudflareTarget {
                 placeholder: Some("https://kindle.commonstacks.com/send".into()),
                 default: Some("https://kindle.commonstacks.com/send".into()),
             },
-            SettingField {
-                key: "shared_secret".into(),
-                label: "Shared secret".into(),
-                help: Some(
-                    "Only required if your relay enforces a token. Leave blank for the default endpoint."
-                        .into(),
-                ),
-                required: false,
-                kind: SettingKind::Secret,
-                placeholder: None,
-                default: None,
-            },
         ]
     }
 
@@ -101,11 +89,20 @@ impl SendTarget for KindleCloudflareTarget {
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| "https://kindle.commonstacks.com/send".into());
-        let shared_secret = settings
-            .fields
-            .get("shared_secret")
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty());
+        // Shared secret is baked in at build time (see src-tauri/build.rs).
+        // Falls back to the per-target setting only if a user has set one for
+        // a self-hosted relay — which the UI no longer exposes, but we still
+        // honor for backwards compatibility with existing configs.
+        let shared_secret = option_env!("CS_KINDLE_RELAY_SECRET")
+            .map(|s| s.to_string())
+            .filter(|s| !s.is_empty())
+            .or_else(|| {
+                settings
+                    .fields
+                    .get("shared_secret")
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+            });
 
         let filename = req
             .file_path
@@ -169,6 +166,11 @@ impl SendTarget for KindleCloudflareTarget {
                     message
                 },
             })
+        } else if status.as_u16() == 401 {
+            Err(anyhow!(
+                "The Kindle relay rejected this request. The build may be missing the relay secret — \
+                 rebuild from source with the latest workers/kindle/.env present."
+            ))
         } else {
             Err(anyhow!(
                 "Relay returned {}: {}",

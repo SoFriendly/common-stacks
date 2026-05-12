@@ -128,7 +128,7 @@ export function Settings() {
   }
 
   return (
-    <div className="px-10 pb-16">
+    <div className="px-6 pb-16">
       <Link
         to="/library"
         className="mb-4 inline-block text-xs text-ink-soft hover:text-ink"
@@ -447,9 +447,13 @@ function SendTargetForm({
     api.getSendTargetSettings(target.descriptor.id).then((saved) => {
       // Layer saved values on top of schema defaults so an unconfigured target
       // still shows sensible pre-filled fields (e.g. crosspoint.local).
+      // Important: schema defaults arrive from Rust as `Option<String>`, which
+      // serializes to `null` when absent. Filter those out — only real string
+      // defaults should land in the values map, otherwise we'd send `null`
+      // back through `save_send_target_settings` and fail validation.
       const seeded: Record<string, string> = {};
       for (const f of target.schema) {
-        if (f.default !== undefined) seeded[f.key] = f.default;
+        if (typeof f.default === "string") seeded[f.key] = f.default;
       }
       setValues({ ...seeded, ...saved });
     });
@@ -474,7 +478,19 @@ function SendTargetForm({
     e.preventDefault();
     setSaving(true);
     try {
-      await api.saveSendTargetSettings(target.descriptor.id, values);
+      // Only persist string values — Rust's HashMap<String,String> rejects
+      // null/undefined.
+      const clean: Record<string, string> = {};
+      for (const [k, v] of Object.entries(values)) {
+        if (typeof v === "string") clean[k] = v;
+      }
+      await api.saveSendTargetSettings(target.descriptor.id, clean);
+      // First-time setup convenience: if the user just configured a
+      // previously-disabled target, flip it on so it actually shows up on
+      // books. They can always toggle it back off in the row above.
+      if (!target.enabled) {
+        await api.setSendTargetEnabled(target.descriptor.id, true);
+      }
       onSaved();
     } catch (err) {
       window.alert(`Save failed: ${err}`);
@@ -485,6 +501,9 @@ function SendTargetForm({
 
   return (
     <form onSubmit={handleSubmit} className="grid gap-3">
+      {target.descriptor.id === "kindle-cloudflare" && (
+        <KindleRelayInfo relayUrl={values.relay_url} />
+      )}
       {target.schema.map((field) =>
         field.kind === "boolean" ? (
           <div key={field.key} className="flex items-start justify-between gap-4">
@@ -850,6 +869,79 @@ function SourceRow({
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+function KindleRelayInfo({ relayUrl }: { relayUrl?: string }) {
+  const [info, setInfo] = useState<{ sender_email: string; sender_name?: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setError(null);
+    setInfo(null);
+    const base = (relayUrl ?? "https://kindle.commonstacks.com/send").trim();
+    if (!base) return;
+    (async () => {
+      try {
+        const body = await api.fetchKindleRelayInfo(base);
+        if (cancelled) return;
+        if (typeof body?.sender_email !== "string") {
+          setError("Relay didn't return a sender address.");
+          return;
+        }
+        setInfo({ sender_email: body.sender_email, sender_name: body.sender_name });
+      } catch (e) {
+        if (!cancelled) setError(`Couldn't reach the relay: ${e}`);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [relayUrl]);
+
+  async function handleCopy(email: string) {
+    try {
+      await navigator.clipboard.writeText(email);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // ignore — clipboard rejected
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-spine/40 bg-paper px-4 py-3">
+      <div className="text-xs uppercase tracking-wider text-ink-soft">
+        Before you send
+      </div>
+      <div className="mt-1 text-sm leading-snug text-ink">
+        Add this address to your Amazon{" "}
+        <span className="font-display italic">
+          Approved Personal Document E-mail List
+        </span>
+        . Without it, Amazon silently drops the email.
+      </div>
+      {info ? (
+        <div className="mt-2 flex items-center gap-2">
+          <code className="rounded bg-shelf px-2 py-1 text-sm">
+            {info.sender_email}
+          </code>
+          <button
+            type="button"
+            onClick={() => handleCopy(info.sender_email)}
+            className="rounded-md border border-shelf bg-white px-2.5 py-1 text-xs text-ink-soft hover:bg-shelf hover:text-ink"
+          >
+            {copied ? "Copied" : "Copy"}
+          </button>
+        </div>
+      ) : error ? (
+        <div className="mt-2 text-xs text-ink-soft">{error}</div>
+      ) : (
+        <div className="mt-2 text-xs text-ink-soft">Loading sender address…</div>
       )}
     </div>
   );

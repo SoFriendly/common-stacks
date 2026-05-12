@@ -75,12 +75,6 @@ pub fn config_dir() -> PathBuf {
     base.join("Common Stacks")
 }
 
-/// Pre-rename location, kept for one-shot migration on startup.
-fn legacy_config_dir() -> PathBuf {
-    let base = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
-    base.join("CommonStacks")
-}
-
 pub fn config_path() -> PathBuf {
     config_dir().join("config.json")
 }
@@ -93,32 +87,7 @@ pub fn default_download_dir() -> PathBuf {
     }
 }
 
-/// If the previous `CommonStacks` config directory exists but the new
-/// `Common Stacks` one doesn't, rename it in-place. Best-effort: any failure
-/// just leaves the old data alone and load_or_seed re-seeds.
-fn migrate_legacy_config_dir() {
-    let new_dir = config_dir();
-    let old_dir = legacy_config_dir();
-    if new_dir.exists() || !old_dir.exists() {
-        return;
-    }
-    match fs::rename(&old_dir, &new_dir) {
-        Ok(_) => tracing::info!(
-            "migrated config dir {} -> {}",
-            old_dir.display(),
-            new_dir.display()
-        ),
-        Err(e) => tracing::warn!(
-            "failed to migrate config dir {} -> {}: {}",
-            old_dir.display(),
-            new_dir.display(),
-            e
-        ),
-    }
-}
-
 pub fn load_or_seed() -> Config {
-    migrate_legacy_config_dir();
     let path = config_path();
     if path.exists() {
         if let Ok(bytes) = fs::read(&path) {

@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import type { EnrichedMetadata, Entry } from "./api";
 
 const STORAGE_KEY = "commonstacks.enrichment.v1";
@@ -6,26 +7,66 @@ interface Store {
   [key: string]: { data: EnrichedMetadata; updatedAt: number };
 }
 
-// Lazily loaded so we don't parse the JSON until the first lookup.
 let memory: Store | null = null;
+let initPromise: Promise<void> | null = null;
 
-function load(): Store {
-  if (memory) return memory;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    memory = raw ? (JSON.parse(raw) as Store) : {};
-  } catch {
-    memory = {};
-  }
-  return memory!;
+/** Force a load from disk (canonical) + localStorage (warm cache). */
+export function ensureLoaded(): Promise<void> {
+  if (initPromise) return initPromise;
+  initPromise = (async () => {
+    const fromLocal = readLocal();
+    let fromDisk: Store = {};
+    try {
+      const raw = await invoke<string>("read_enrichment_cache");
+      if (raw) fromDisk = JSON.parse(raw);
+    } catch {
+      // No backend (browser preview?) or first run — fall through with empty.
+    }
+    // Merge by entry-level recency. Disk is canonical for cold starts; if
+    // localStorage has a fresher entry (last session wrote both, then OS
+    // wiped the disk write for some reason) we keep it.
+    memory = { ...fromDisk };
+    for (const [k, v] of Object.entries(fromLocal)) {
+      const existing = memory[k];
+      if (!existing || existing.updatedAt < v.updatedAt) {
+        memory[k] = v;
+      }
+    }
+  })();
+  return initPromise;
 }
 
-function persist() {
-  if (!memory) return;
+function readLocal(): Store {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(memory));
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as Store) : {};
   } catch {
-    // quota or privacy mode — best effort.
+    return {};
+  }
+}
+
+function ensureMemory(): Store {
+  if (memory) return memory;
+  // Synchronous fallback: seed from localStorage so render-time reads have
+  // *something* while the async disk load is still in flight.
+  memory = readLocal();
+  return memory;
+}
+
+async function persist(): Promise<void> {
+  if (!memory) return;
+  const serialized = JSON.stringify(memory);
+  // Write both layers. localStorage is fast and survives most cases; the
+  // disk file is canonical for the rest.
+  try {
+    localStorage.setItem(STORAGE_KEY, serialized);
+  } catch {
+    // quota or privacy mode — ignore.
+  }
+  try {
+    await invoke("write_enrichment_cache", { contents: serialized });
+  } catch {
+    // No backend — best-effort.
   }
 }
 
@@ -63,7 +104,7 @@ export function keysForEntry(e: Entry): string[] {
 }
 
 export function get(entry: Entry): EnrichedMetadata | null {
-  const store = load();
+  const store = ensureMemory();
   for (const k of keysForEntry(entry)) {
     const hit = store[k];
     if (hit) return hit.data;
@@ -71,15 +112,21 @@ export function get(entry: Entry): EnrichedMetadata | null {
   return null;
 }
 
+/** True if any key for this entry already has cached enrichment data. */
+export function has(entry: Entry): boolean {
+  return get(entry) !== null;
+}
+
 export function set(entry: Entry, data: EnrichedMetadata): void {
-  const store = load();
+  const store = ensureMemory();
   const keys = keysForEntry(entry);
   if (keys.length === 0) return;
   const value = { data, updatedAt: Date.now() };
   for (const k of keys) {
     store[k] = value;
   }
-  persist();
+  // Fire-and-forget persist. Awaiting would block the render pipeline.
+  void persist();
 }
 
 /**
