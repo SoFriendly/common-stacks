@@ -41,25 +41,23 @@ BUNDLE_DIR="src-tauri/target/aarch64-apple-darwin/release/bundle"
 DMG=$(find "$BUNDLE_DIR/dmg" -name "*.dmg" | head -1)
 APP=$(find "$BUNDLE_DIR/macos" -maxdepth 1 -name "*.app" | head -1)
 
-# Mirror artifacts under release/bundle paths the uploader expects.
+# tauri build (with bundle.createUpdaterArtifacts: true) already produces
+# the updater tarball + minisign .sig in $BUNDLE_DIR/macos. Mirror everything
+# the uploader looks for under the canonical no-space CommonStacks_* names.
 mkdir -p src-tauri/target/release/bundle/dmg
 cp "$DMG" "src-tauri/target/release/bundle/dmg/CommonStacks_${VERSION}_aarch64.dmg"
 
-# Updater tarball + signature
-TAR="src-tauri/target/release/bundle/CommonStacks_${VERSION}_darwin-aarch64.app.tar.gz"
-tar -C "$(dirname "$APP")" -czf "$TAR" "$(basename "$APP")"
-echo "$TAURI_SIGNING_PRIVATE_KEY" > /tmp/cs-sign.key
-bunx @tauri-apps/cli signer sign \
-  --private-key-path /tmp/cs-sign.key \
-  --password "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" \
-  "$TAR" > /tmp/cs-sign.out
-rm -f /tmp/cs-sign.key
-# tauri signer writes <file>.sig alongside the artifact
-if [ ! -f "${TAR}.sig" ]; then
-  echo "Error: expected ${TAR}.sig from signer"
-  cat /tmp/cs-sign.out
+SRC_TAR=$(find "$BUNDLE_DIR/macos" -maxdepth 1 -name "*.app.tar.gz" | head -1)
+SRC_SIG=$(find "$BUNDLE_DIR/macos" -maxdepth 1 -name "*.app.tar.gz.sig" | head -1)
+if [ -z "$SRC_TAR" ] || [ -z "$SRC_SIG" ]; then
+  echo "Error: tauri did not produce an updater tarball + .sig in $BUNDLE_DIR/macos"
+  echo "Check that bundle.createUpdaterArtifacts is true in tauri.conf.json and that"
+  echo "TAURI_SIGNING_PRIVATE_KEY was set during the build."
   exit 1
 fi
+TAR="src-tauri/target/release/bundle/CommonStacks_${VERSION}_darwin-aarch64.app.tar.gz"
+cp "$SRC_TAR" "$TAR"
+cp "$SRC_SIG" "${TAR}.sig"
 
 # Notarize the .dmg if Apple credentials exist.
 if [ -n "$APPLE_ID" ] && [ -n "$APPLE_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
