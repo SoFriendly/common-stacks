@@ -5,6 +5,7 @@ import { Settings } from "./routes/Settings";
 import { Browse } from "./routes/Browse";
 import { Book } from "./routes/Book";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { UpdateChecker } from "./components/UpdateChecker";
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
         </Routes>
         </ErrorBoundary>
       </main>
+      <UpdateChecker />
     </div>
   );
 }

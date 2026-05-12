@@ -1,0 +1,118 @@
+name: Release builds
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  linux:
+    name: Linux (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            arch: x86_64
+            suffix: amd64
+            runner: ubuntu-22.04
+          - target: aarch64-unknown-linux-gnu
+            arch: aarch64
+            suffix: arm64
+            runner: ubuntu-22.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Install Linux deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+      - run: bun install
+      - run: bun run build
+      - name: Tauri build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: bunx @tauri-apps/cli build --target ${{ matrix.target }}
+      - name: Stage AppImage
+        run: |
+          mkdir -p staging/appimage
+          cp src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*.AppImage staging/appimage/
+          cp src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*.AppImage.sig staging/appimage/
+      - name: Stage deb
+        run: |
+          mkdir -p staging/deb
+          cp src-tauri/target/${{ matrix.target }}/release/bundle/deb/*.deb staging/deb/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage-${{ matrix.arch }}
+          path: staging/appimage/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-deb-${{ matrix.arch }}
+          path: staging/deb/*
+
+  windows:
+    name: Windows (x86_64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: bun install
+      - run: bun run build
+      - name: Tauri build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: bunx @tauri-apps/cli build --target x86_64-pc-windows-msvc
+      - name: Stage MSI
+        shell: bash
+        run: |
+          mkdir -p staging/msi staging/nsis
+          cp src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi staging/msi/ || true
+          cp src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi.sig staging/msi/ || true
+          cp src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe staging/nsis/ || true
+          cp src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe.sig staging/nsis/ || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-msi
+          path: staging/msi/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-nsis
+          path: staging/nsis/*
+
+  publish:
+    name: Upload to Cloudflare R2
+    needs: [linux, windows]
+    runs-on: ubuntu-22.04
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Install jq + aws cli
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq awscli
+      - name: Upload + merge latest.json
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_R2_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY }}
+          CLOUDFLARE_R2_SECRET_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_KEY }}
+        run: ./scripts/upload-to-cloudflare.sh

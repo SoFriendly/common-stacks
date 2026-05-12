@@ -1,3 +1,13 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Build output
+dist
+dist-ssr
+build
+
 # Logs
 logs
 *.log
@@ -6,19 +16,38 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+bun-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Environment / secrets — never commit
+.env
+.env.*
+!.env.example
 *.local
 
-# Editor directories and files
+# Tauri signing keys (must never be committed)
+*.key
+*.key.pub
+.tauri/
+
+# Release artifacts
+artifacts/
+src-tauri/target/
+src-tauri/WixTools/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editors
 .vscode/*
 !.vscode/extensions.json
 .idea
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# Misc
+.cache
+coverage

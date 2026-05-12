@@ -12,6 +12,8 @@ import {
 } from "../lib/api";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { ChevronDown, Puzzle } from "lucide-react";
+import { getVersion } from "@tauri-apps/api/app";
+import { checkForUpdate, useUpdateStatus } from "../lib/updateStore";
 
 export function Settings() {
   const [sources, setSources] = useState<Source[]>([]);
@@ -300,6 +302,11 @@ export function Settings() {
         <SendTargetsPanel />
       </section>
 
+      <section className="mb-12 max-w-2xl">
+        <h2 className="mb-3 font-display text-xl">App updates</h2>
+        <UpdatePanel />
+      </section>
+
       <section className="max-w-2xl">
         <h2 className="mb-3 font-display text-xl">Import / Export</h2>
         <div className="flex gap-2">
@@ -317,6 +324,62 @@ export function Settings() {
           </button>
         </div>
       </section>
+    </div>
+  );
+}
+
+function UpdatePanel() {
+  const status = useUpdateStatus();
+  const [version, setVersion] = useState<string>("");
+  const [checking, setChecking] = useState(false);
+
+  useEffect(() => {
+    getVersion().then(setVersion).catch(() => setVersion(""));
+  }, []);
+
+  const statusText = (() => {
+    switch (status.kind) {
+      case "checking":
+        return "Checking…";
+      case "up-to-date":
+        return "You're on the latest version.";
+      case "available":
+        return `Update available: ${status.version}`;
+      case "downloading":
+        return "Downloading…";
+      case "installing":
+        return "Installing…";
+      case "ready":
+        return "Update installed — restart to apply.";
+      case "error":
+        return `Error: ${status.message}`;
+      default:
+        return "";
+    }
+  })();
+
+  async function handleCheck() {
+    setChecking(true);
+    try {
+      await checkForUpdate();
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-between rounded-md border border-shelf bg-white p-3">
+      <div>
+        <div className="text-sm">CommonStacks {version || "—"}</div>
+        {statusText && <div className="mt-0.5 text-xs text-ink-soft">{statusText}</div>}
+      </div>
+      <button
+        onClick={handleCheck}
+        disabled={checking || status.kind === "downloading" || status.kind === "installing"}
+        className="rounded-md border border-shelf bg-white px-3 py-2 text-sm hover:bg-shelf disabled:opacity-50"
+      >
+        Check for updates
+      </button>
     </div>
   );
 }
