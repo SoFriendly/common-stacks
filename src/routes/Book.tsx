@@ -197,6 +197,16 @@ export function Book() {
     return out;
   }, [entry]);
 
+  // All hooks must run unconditionally — keep these above the early return.
+  const cover = entry?.cover ?? entry?.thumbnail;
+  type CoverLoadState = "loading" | "real" | "failed";
+  const [coverState, setCoverState] = useState<CoverLoadState>(
+    cover ? "loading" : "failed",
+  );
+  useEffect(() => {
+    setCoverState(cover ? "loading" : "failed");
+  }, [cover]);
+
   if (!state || !entry) return null;
 
   async function handleDownload(a: Acquisition) {
@@ -251,17 +261,6 @@ export function Book() {
   function viewInDownloads() {
     navigate("/downloads");
   }
-
-  const cover = entry.cover ?? entry.thumbnail;
-  type CoverLoadState = "loading" | "real" | "failed";
-  const [coverState, setCoverState] = useState<CoverLoadState>(
-    cover ? "loading" : "failed",
-  );
-  // Reset whenever the URL changes — otherwise a prior failure / successful
-  // load would carry over and either hide or stale-show the new image.
-  useEffect(() => {
-    setCoverState(cover ? "loading" : "failed");
-  }, [cover]);
 
   return (
     <div className="mx-auto max-w-5xl px-10 pb-20">
