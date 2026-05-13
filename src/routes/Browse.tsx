@@ -5,6 +5,7 @@ import { CoverCard } from "../components/CoverCard";
 import { CategoryTile } from "../components/CategoryTile";
 import { openEntry } from "../lib/entry";
 import { maybeApply as applyEnrichmentToEntry } from "../lib/enrichment";
+import { primaryBadge, formatLabel, isSquareFormat } from "../lib/format";
 
 export function Browse() {
   const [params] = useSearchParams();
@@ -105,12 +106,15 @@ export function Browse() {
           <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-x-5 gap-y-8">
             {feed.entries.map((raw) => {
               const e = applyEnrichmentToEntry(raw);
+              const badge = primaryBadge(e);
               return (
                 <CoverCard
                   key={e.id}
                   title={e.title}
                   authors={e.authors}
                   cover={e.cover ?? e.thumbnail}
+                  badge={badge ? formatLabel(badge) : undefined}
+                  square={isSquareFormat(badge)}
                   onClick={() => openEntry(navigate, { sourceId, entry: e })}
                 />
               );

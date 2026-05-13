@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router";
 import { api, type Acquisition, type Entry, type EnrichedMetadata } from "../lib/api";
 import { DefaultCover } from "../components/DefaultCover";
 import { set as cacheEnrichment, applyToEntry, get as getCachedEnrichment, ensureLoaded as ensureEnrichmentLoaded } from "../lib/enrichment";
+import { classifyAcquisition, entryFormats, formatLabel as formatKindLabel } from "../lib/format";
 
 /** State passed via navigation when clicking a cover. */
 export interface BookNavState {
@@ -43,6 +44,9 @@ const MIME_LABEL: Record<string, string> = {
 };
 
 function formatLabel(a: Acquisition): string {
+  const kind = classifyAcquisition(a);
+  if (kind === "audiobook") return "Audiobook";
+  if (kind === "comic") return "Comic";
   if (a.mime && MIME_LABEL[a.mime.split(";")[0].trim()]) {
     return MIME_LABEL[a.mime.split(";")[0].trim()];
   }
@@ -59,6 +63,8 @@ function extFromHref(href: string): string | null {
 }
 
 function rankAcquisition(a: Acquisition): number {
+  const kind = classifyAcquisition(a);
+  if (kind === "audiobook") return 1; // surface near the top alongside epub
   const ext = extFromHref(a.href);
   const fromMime = a.mime?.includes("epub")
     ? 0
@@ -239,7 +245,13 @@ export function Book() {
 
       <div className="flex flex-col gap-10 md:flex-row">
         <div className="shrink-0">
-          <div className="relative aspect-[2/3] w-56 overflow-hidden rounded-md bg-shelf shadow-lg ring-1 ring-black/5">
+          <div
+            className={`relative w-56 overflow-hidden rounded-md bg-shelf shadow-lg ring-1 ring-black/5 ${
+              entryFormats(entry).includes("audiobook")
+                ? "aspect-square"
+                : "aspect-[2/3]"
+            }`}
+          >
             <DefaultCover
               title={entry.title}
               author={entry.authors[0]}
@@ -275,7 +287,27 @@ export function Book() {
             </div>
           )}
 
-          <div className="mt-2 text-xs text-ink-soft">
+          {entryFormats(entry).length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {entryFormats(entry).map((f) => {
+                const isAudio = f === "audiobook";
+                return (
+                  <span
+                    key={f}
+                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wider ${
+                      isAudio
+                        ? "bg-ink text-paper"
+                        : "border border-shelf bg-paper text-ink-soft"
+                    }`}
+                  >
+                    {formatKindLabel(f)}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="mt-3 text-xs text-ink-soft">
             {state.sourceName ?? state.sourceId}
             {state.alternateSources && state.alternateSources.length > 1 && (
               <> · available from {state.alternateSources.length} libraries</>

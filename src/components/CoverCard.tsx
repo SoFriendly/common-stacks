@@ -6,6 +6,10 @@ interface Props {
   title: string;
   authors?: string[];
   cover?: string;
+  /** Small format badge overlaid on the cover ("Audiobook", "PDF", etc.) */
+  badge?: string;
+  /** Render the cover as a square (e.g. for audiobooks) instead of 2:3. */
+  square?: boolean;
   className?: string;
   onClick?: () => void;
 }
@@ -18,7 +22,7 @@ type CoverState =
 
 const SMALL_IMAGE_PX = 96; // anything narrower than this is treated as an icon
 
-export function CoverCard({ title, authors, cover, className, onClick }: Props) {
+export function CoverCard({ title, authors, cover, badge, square, className, onClick }: Props) {
   const [state, setState] = useState<CoverState>(
     cover ? { kind: "loading" } : { kind: "failed" },
   );
@@ -42,7 +46,12 @@ export function CoverCard({ title, authors, cover, className, onClick }: Props) 
         className,
       )}
     >
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-md bg-shelf shadow-sm ring-1 ring-black/5 transition-shadow group-hover:shadow-lg">
+      <div
+        className={cn(
+          "relative w-full overflow-hidden rounded-md bg-shelf shadow-sm ring-1 ring-black/5 transition-shadow group-hover:shadow-lg",
+          square ? "aspect-square" : "aspect-[2/3]",
+        )}
+      >
         {cover && state.kind !== "failed" && state.kind !== "icon" && (
           <img
             src={cover}
@@ -76,6 +85,11 @@ export function CoverCard({ title, authors, cover, className, onClick }: Props) 
               style={{ imageRendering: "auto" }}
             />
           </div>
+        )}
+        {badge && (
+          <span className="absolute top-1.5 left-1.5 rounded-full bg-ink/85 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-paper backdrop-blur-sm">
+            {badge}
+          </span>
         )}
       </div>
       <div className="mt-2 line-clamp-2 font-display text-sm leading-snug text-ink">

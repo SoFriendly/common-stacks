@@ -254,6 +254,8 @@ function DownloadGridCard({
   const { file, meta } = item;
   const displayTitle = meta?.title ?? stripExt(file.name);
   const author = meta?.authors[0];
+  const badge = badgeForExtension(file.extension);
+  const isAudiobook = badge === "Audiobook";
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -286,7 +288,9 @@ function DownloadGridCard({
       >
         <button
           onClick={onOpen}
-          className="relative aspect-[2/3] w-full overflow-hidden rounded-md bg-shelf shadow-sm ring-1 ring-black/5 transition-shadow hover:shadow-lg"
+          className={`relative w-full overflow-hidden rounded-md bg-shelf shadow-sm ring-1 ring-black/5 transition-shadow hover:shadow-lg ${
+            isAudiobook ? "aspect-square" : "aspect-[2/3]"
+          }`}
         >
           {meta?.cover_data_url ? (
             <img
@@ -307,6 +311,11 @@ function DownloadGridCard({
                 reading…
               </span>
             </div>
+          )}
+          {badge && (
+            <span className="absolute top-1.5 left-1.5 rounded-full bg-ink/85 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-paper backdrop-blur-sm">
+              {badge}
+            </span>
           )}
         </button>
 
@@ -466,6 +475,19 @@ function friendlyError(raw: string, targetId?: string): string {
     return `${cleaned} — make sure the destination folder exists on the Crosspoint's SD card (you can change it in Settings → Send-to targets).`;
   }
   return cleaned || raw;
+}
+
+const AUDIO_EXTS = new Set(["m4b", "mp3", "m4a", "aac", "opus", "ogg", "flac", "wav"]);
+
+function badgeForExtension(ext: string | undefined | null): string | null {
+  if (!ext) return null;
+  const e = ext.toLowerCase();
+  if (AUDIO_EXTS.has(e)) return "Audiobook";
+  if (e === "pdf") return "PDF";
+  if (e === "cbz" || e === "cbr") return "Comic";
+  // EPUB and unknown formats render without a badge (epub is the default
+  // assumption; unknown is noise).
+  return null;
 }
 
 function stripExt(name: string): string {

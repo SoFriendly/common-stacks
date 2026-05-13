@@ -6,6 +6,7 @@ import { CategoryTile } from "../components/CategoryTile";
 import { Rail } from "../components/Rail";
 import { openEntry } from "../lib/entry";
 import { maybeApply as applyEnrichmentToEntry } from "../lib/enrichment";
+import { primaryBadge, formatLabel, isSquareFormat } from "../lib/format";
 import {
   Search as SearchIcon,
   X,
@@ -398,12 +399,15 @@ export function Library() {
                   // enriched after the Library rail was fetched still surface
                   // the new cover/author data without waiting for a refresh.
                   const e = applyEnrichmentToEntry(raw);
+                  const badge = primaryBadge(e);
                   return (
                     <CoverCard
                       key={`${rail.key}:${e.id}`}
                       title={e.title}
                       authors={e.authors}
                       cover={e.cover ?? e.thumbnail}
+                      badge={badge ? formatLabel(badge) : undefined}
+                      square={isSquareFormat(badge)}
                       onClick={() =>
                         openEntry(navigate, {
                           sourceId: b.source.id,
@@ -507,12 +511,15 @@ function SearchResultsView({
         <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-x-5 gap-y-8">
           {result.merged.map((b) => {
             const enriched = applyEnrichmentToEntry(mergedBookAsEntry(b));
+            const badge = primaryBadge(enriched);
             return (
               <div key={b.key} className="flex flex-col">
                 <CoverCard
                   title={enriched.title}
                   authors={enriched.authors}
                   cover={enriched.cover ?? enriched.thumbnail}
+                  badge={badge ? formatLabel(badge) : undefined}
+                  square={isSquareFormat(badge)}
                   onClick={() => onOpen(b)}
                 />
                 {b.sources.length > 1 && (
