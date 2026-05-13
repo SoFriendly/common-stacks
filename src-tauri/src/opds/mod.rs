@@ -9,10 +9,19 @@ use feed::Feed;
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, USER_AGENT};
 use std::time::Duration;
 
-// Prefer Atom over JSON via q-weights. Both are widely supported; well-
-// behaved servers respect the ranking and return Atom when given the
-// choice. JSON is accepted as a fallback for catalogs that only serve it.
-const OPDS_ACCEPT: &str = "application/atom+xml;profile=opds-catalog, application/atom+xml, application/opds+json;q=0.8, application/xml;q=0.6, */*;q=0.5";
+// Prefer OPDS 2.0 (Readium Web Pub Manifest JSON) when offered, fall back
+// to OPDS 1.2 (Atom XML) otherwise.
+//
+// OPDS 1.2 was finalized before audiobooks had a standard representation,
+// so the only conformant way to expose them is via OPDS 2.0 — catalogs
+// that support both formats deliberately filter audiobooks out of the
+// Atom response. Asking for JSON first is the spec-correct way to opt
+// into the richer entry types.
+//
+// Atom-only catalogs (Project Gutenberg, Standard Ebooks, anything older)
+// will still serve Atom via q-weighted negotiation. They have no
+// audiobooks to lose.
+const OPDS_ACCEPT: &str = "application/opds+json, application/atom+xml;profile=opds-catalog;q=0.8, application/atom+xml;q=0.7, application/xml;q=0.6, */*;q=0.5";
 
 pub struct OpdsClient {
     http: reqwest::Client,
