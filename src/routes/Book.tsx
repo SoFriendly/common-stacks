@@ -214,9 +214,38 @@ export function Book() {
       setDownloadState({
         kind: "error",
         href: a.href,
-        message: String(e),
+        message: friendlyDownloadError(String(e)),
       });
     }
+  }
+
+  function friendlyDownloadError(raw: string): string {
+    // Match a Mayberry branch peer URL like
+    // https://ivory-elm.branch.pub/download/... so we can name the
+    // offline branch in the error.
+    const branchMatch = raw.match(/https?:\/\/([a-z0-9-]+)\.branch\.pub\//i);
+    const status5xx = /\b5\d\d\b/.test(raw);
+    if (branchMatch && status5xx) {
+      const name = branchSlugToName(branchMatch[1]);
+      return `${name} is out for lunch at the moment. Try again in a few minutes.`;
+    }
+    // Generic 5xx from another host.
+    if (status5xx) {
+      return "The library's server is having a moment. Try again shortly.";
+    }
+    // Strip noisy reqwest envelope ("error sending request for url (...)").
+    return raw
+      .replace(/error sending request for url \([^)]*\)\.?\s*/i, "")
+      .replace(/HTTP status server error \(([^)]+)\) for url \([^)]*\)/i, "$1")
+      .trim();
+  }
+
+  function branchSlugToName(slug: string): string {
+    return slug
+      .split("-")
+      .filter(Boolean)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
   }
 
   function viewInDownloads() {

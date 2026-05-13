@@ -26,16 +26,16 @@ esac
 new="${MAJ}.${MIN}.${PAT}"
 echo "Bumping $current -> $new"
 
-# tauri.conf.json
-sed -i.bak "0,/\"version\": \"$current\"/s//\"version\": \"$new\"/" src-tauri/tauri.conf.json
+# tauri.conf.json — single root-level "version" key
+sed -i.bak "s/\"version\": \"$current\"/\"version\": \"$new\"/" src-tauri/tauri.conf.json
 rm -f src-tauri/tauri.conf.json.bak
 
-# Cargo.toml (package version, first occurrence)
-sed -i.bak "0,/^version = \"$current\"/s//version = \"$new\"/" src-tauri/Cargo.toml
+# Cargo.toml — anchored on start-of-line to skip dependency versions
+sed -i.bak "s/^version = \"$current\"/version = \"$new\"/" src-tauri/Cargo.toml
 rm -f src-tauri/Cargo.toml.bak
 
-# package.json
-sed -i.bak "0,/\"version\": \"$current\"/s//\"version\": \"$new\"/" package.json
+# package.json — single root-level "version" key
+sed -i.bak "s/\"version\": \"$current\"/\"version\": \"$new\"/" package.json
 rm -f package.json.bak
 
 # Refresh Cargo.lock entry so it doesn't lag
