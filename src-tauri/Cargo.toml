@@ -1,6 +1,6 @@
 [package]
 name = "common-stacks"
-version = "0.1.1"
+version = "0.1.2"
 description = "Common Stacks — a local-first OPDS storefront"
 authors = ["Justin Mitchell"]
 edition = "2021"
