@@ -342,24 +342,32 @@ function DownloadGridCard({
               className="absolute right-0 z-30 mt-1 w-40 overflow-hidden rounded-md border border-shelf bg-paper shadow-lg ring-1 ring-black/10"
               onClick={(e) => e.stopPropagation()}
             >
-              {sendTargets
-                .filter((t) => {
-                  if (!t.enabled) return false;
-                  const needsSetup =
-                    t.schema.some((f) => f.required) && !t.configured;
-                  return !needsSetup;
-                })
-                .map((t) => (
-                  <MenuItem
-                    key={t.descriptor.id}
-                    onClick={withClose(() => onSend(t))}
-                  >
-                    Send to {t.descriptor.name.replace(/^Send to /, "")}
-                  </MenuItem>
-                ))}
-              {sendTargets.some((t) => t.enabled && !(t.schema.some((f) => f.required) && !t.configured)) && (
-                <div className="my-1 border-t border-shelf" />
-              )}
+              {/* Send-to targets only show for non-audiobook files. Every
+                  current target (Kindle, Crosspoint, WebDAV) is e-reader /
+                  document-oriented; sending an m4b to a Kindle is just
+                  going to waste the user's time. */}
+              {!isAudiobook &&
+                sendTargets
+                  .filter((t) => {
+                    if (!t.enabled) return false;
+                    const needsSetup =
+                      t.schema.some((f) => f.required) && !t.configured;
+                    return !needsSetup;
+                  })
+                  .map((t) => (
+                    <MenuItem
+                      key={t.descriptor.id}
+                      onClick={withClose(() => onSend(t))}
+                    >
+                      Send to {t.descriptor.name.replace(/^Send to /, "")}
+                    </MenuItem>
+                  ))}
+              {!isAudiobook &&
+                sendTargets.some(
+                  (t) =>
+                    t.enabled &&
+                    !(t.schema.some((f) => f.required) && !t.configured),
+                ) && <div className="my-1 border-t border-shelf" />}
               <MenuItem onClick={withClose(onReveal)}>Reveal in Finder</MenuItem>
               <MenuItem onClick={withClose(onRename)}>Rename…</MenuItem>
               <MenuItem onClick={withClose(onDelete)} danger>
