@@ -95,6 +95,27 @@ fi
 
 echo "macOS build complete: $DMG"
 
+# Auto-commit + tag when this run included a version bump. Only the version
+# files are staged so any unrelated WIP stays untouched.
+if [ "$BUMP" != "--no-bump" ]; then
+  if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+    echo "(tag v$VERSION already exists — skipping commit + tag)"
+  else
+    echo ""
+    echo "=== Committing version bump ==="
+    git add src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock package.json
+    git commit -m "Release v$VERSION"
+    git tag -a "v$VERSION" -m "Release v$VERSION"
+    if [ "$UPLOAD" = "1" ]; then
+      CURRENT_BRANCH=$(git branch --show-current)
+      git push origin "$CURRENT_BRANCH"
+      git push origin "v$VERSION"
+    else
+      echo "(skipped git push — pass --upload to push commit + tag)"
+    fi
+  fi
+fi
+
 if [ "$UPLOAD" = "1" ]; then
   echo ""
   echo "=== Uploading to Cloudflare R2 ==="
