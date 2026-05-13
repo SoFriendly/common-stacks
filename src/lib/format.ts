@@ -69,6 +69,10 @@ export function isSquareFormat(kind: FormatKind | null | undefined): boolean {
   return kind === "audiobook";
 }
 
+export function isAudiobookEntry(e: Pick<Entry, "acquisitions">): boolean {
+  return entryFormats(e).includes("audiobook");
+}
+
 export function formatLabel(kind: FormatKind): string {
   switch (kind) {
     case "epub":
@@ -85,19 +89,15 @@ export function formatLabel(kind: FormatKind): string {
 }
 
 /**
- * Pick the single most informative badge for a cover card. If a book has
- * an audiobook acquisition we show that (Audiobook is the more important
- * signal to surface — covers are usually book covers so EPUB is the
- * default expectation). Returns null when the entry is just an EPUB or
- * has no acquisitions (e.g. nav entries).
+ * Pick the single most informative badge for a cover card. Audiobooks are
+ * not badged — the square cover shape already communicates that. Returns
+ * null when the entry is just an EPUB or has no acquisitions (e.g. nav
+ * entries).
  */
 export function primaryBadge(e: Pick<Entry, "acquisitions">): FormatKind | null {
-  const formats = entryFormats(e);
-  if (formats.includes("audiobook")) return "audiobook";
+  const formats = entryFormats(e).filter((f) => f !== "audiobook");
   if (formats.length === 0) return null;
-  // EPUB is the assumed default; don't badge it.
   if (formats.length === 1 && formats[0] === "epub") return null;
-  // Mixed (e.g. EPUB + PDF) — pick the first non-epub.
   const nonEpub = formats.find((f) => f !== "epub");
   return nonEpub ?? null;
 }

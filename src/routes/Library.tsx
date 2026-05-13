@@ -6,7 +6,7 @@ import { CategoryTile } from "../components/CategoryTile";
 import { Rail } from "../components/Rail";
 import { openEntry } from "../lib/entry";
 import { maybeApply as applyEnrichmentToEntry } from "../lib/enrichment";
-import { primaryBadge, formatLabel, isSquareFormat } from "../lib/format";
+import { primaryBadge, formatLabel, isAudiobookEntry } from "../lib/format";
 import {
   Search as SearchIcon,
   X,
@@ -407,7 +407,7 @@ export function Library() {
                       authors={e.authors}
                       cover={e.cover ?? e.thumbnail}
                       badge={badge ? formatLabel(badge) : undefined}
-                      square={isSquareFormat(badge)}
+                      square={isAudiobookEntry(e)}
                       onClick={() =>
                         openEntry(navigate, {
                           sourceId: b.source.id,
@@ -519,7 +519,7 @@ function SearchResultsView({
                   authors={enriched.authors}
                   cover={enriched.cover ?? enriched.thumbnail}
                   badge={badge ? formatLabel(badge) : undefined}
-                  square={isSquareFormat(badge)}
+                  square={isAudiobookEntry(enriched)}
                   onClick={() => onOpen(b)}
                 />
                 {b.sources.length > 1 && (

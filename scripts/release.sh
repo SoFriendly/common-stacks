@@ -2,8 +2,9 @@
 set -e
 
 # Usage: ./scripts/release.sh [major|minor|patch|<version>]
-# Bumps version, builds macOS locally, commits & tags, pushes (triggers Linux/Windows CI),
-# and uploads macOS artifacts to R2.
+# Convenience wrapper: bump + build + commit + tag + push + upload, in that order.
+# Equivalent to: ./scripts/build-macos.sh <bump> --upload
+# (Linux/Windows builds run in CI once the tag is pushed.)
 
 BUMP=${1:?Usage: ./scripts/release.sh [major|minor|patch|<version>]}
 
@@ -15,33 +16,17 @@ fi
 
 if ! git diff --quiet --exit-code -- ':!src-tauri/tauri.conf.json' ':!src-tauri/Cargo.toml' ':!src-tauri/Cargo.lock' ':!package.json'; then
   echo "Error: uncommitted changes outside version files."
+  echo "Commit or stash them, then re-run."
   exit 1
 fi
 
-OLD=$(grep '"version"' src-tauri/tauri.conf.json | head -1 | sed 's/.*"version": "\(.*\)".*/\1/')
-echo "Current version: $OLD"
+./scripts/build-macos.sh "$BUMP" --upload
 
-./scripts/build-macos.sh "$BUMP"
-
-NEW=$(grep '"version"' src-tauri/tauri.conf.json | head -1 | sed 's/.*"version": "\(.*\)".*/\1/')
-echo "New version: $NEW"
-
-if git rev-parse "v$NEW" >/dev/null 2>&1; then
-  echo "Error: tag v$NEW already exists"
-  exit 1
-fi
-
-git add src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock package.json
-git commit -m "Release v$NEW"
-git tag -a "v$NEW" -m "Release v$NEW"
-git push origin "$CURRENT_BRANCH"
-git push origin "v$NEW"
-
-./scripts/upload-to-cloudflare.sh
+VERSION=$(grep '"version"' src-tauri/tauri.conf.json | head -1 | sed 's/.*"version": "\(.*\)".*/\1/')
 
 cat <<EOF
 
-=== Release v$NEW pushed ===
+=== Release v$VERSION pushed ===
 macOS uploaded. GitHub Actions is building Linux/Windows.
 Once CI finishes, re-run ./scripts/upload-to-cloudflare.sh from the repo root
 with the artifacts/ folder populated, to merge those platforms into latest.json.

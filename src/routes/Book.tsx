@@ -292,11 +292,16 @@ export function Book() {
                 className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${
                   coverState === "real" ? "opacity-100" : "opacity-0"
                 }`}
+                ref={(el) => {
+                  // If the browser already had this image cached (e.g. from
+                  // the Library view), `complete` is true before React
+                  // attaches onLoad — leaving us stuck at "loading".
+                  if (el && el.complete && el.naturalWidth > 0) {
+                    setCoverState(el.naturalWidth < 96 ? "failed" : "real");
+                  }
+                }}
                 onLoad={(e) => {
                   const w = e.currentTarget.naturalWidth;
-                  // Treat anything smaller than ~96px as a placeholder /
-                  // missing-cover image (Open Library serves a tiny GIF for
-                  // unknown books). Falling back to DefaultCover is nicer.
                   setCoverState(w > 0 && w < 96 ? "failed" : "real");
                 }}
                 onError={() => setCoverState("failed")}

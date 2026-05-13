@@ -5,7 +5,7 @@ import { CoverCard } from "../components/CoverCard";
 import { CategoryTile } from "../components/CategoryTile";
 import { openEntry } from "../lib/entry";
 import { maybeApply as applyEnrichmentToEntry } from "../lib/enrichment";
-import { primaryBadge, formatLabel, isSquareFormat } from "../lib/format";
+import { primaryBadge, formatLabel, isAudiobookEntry } from "../lib/format";
 
 export function Browse() {
   const [params] = useSearchParams();
@@ -114,7 +114,7 @@ export function Browse() {
                   authors={e.authors}
                   cover={e.cover ?? e.thumbnail}
                   badge={badge ? formatLabel(badge) : undefined}
-                  square={isSquareFormat(badge)}
+                  square={isAudiobookEntry(e)}
                   onClick={() => openEntry(navigate, { sourceId, entry: e })}
                 />
               );
