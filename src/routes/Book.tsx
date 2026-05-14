@@ -4,6 +4,7 @@ import { api, type Acquisition, type Entry, type EnrichedMetadata } from "../lib
 import { DefaultCover } from "../components/DefaultCover";
 import { set as cacheEnrichment, applyToEntry, get as getCachedEnrichment, ensureLoaded as ensureEnrichmentLoaded } from "../lib/enrichment";
 import { classifyAcquisition, entryFormats, formatLabel as formatKindLabel } from "../lib/format";
+import { useIsMobile } from "../lib/platform";
 
 /** State passed via navigation when clicking a cover. */
 export interface BookNavState {
@@ -83,6 +84,7 @@ function rankAcquisition(a: Acquisition): number {
 export function Book() {
   const location = useLocation();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const state = location.state as BookNavState | null;
 
   // If accessed without state, just bail home.
@@ -263,18 +265,20 @@ export function Book() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-10 pb-20">
-      <button
-        onClick={() => navigate(-1)}
-        className="mb-6 text-xs text-ink-soft hover:text-ink"
-      >
-        ← Back
-      </button>
+    <div className={isMobile ? "mx-auto max-w-5xl px-4 pb-20" : "mx-auto max-w-5xl px-10 pb-20"}>
+      {!isMobile && (
+        <button
+          onClick={() => navigate(-1)}
+          className="mb-6 text-xs text-ink-soft hover:text-ink"
+        >
+          ← Back
+        </button>
+      )}
 
-      <div className="flex flex-col gap-10 md:flex-row">
+      <div className="flex flex-row gap-4 md:gap-10">
         <div className="shrink-0">
           <div
-            className={`relative w-56 overflow-hidden rounded-md bg-shelf shadow-lg ring-1 ring-black/5 ${
+            className={`relative w-32 overflow-hidden rounded-md bg-shelf shadow-lg ring-1 ring-black/5 sm:w-40 md:w-56 ${
               entryFormats(entry).includes("audiobook")
                 ? "aspect-square"
                 : "aspect-[2/3]"

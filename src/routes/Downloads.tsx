@@ -8,6 +8,7 @@ import {
 import { DefaultCover } from "../components/DefaultCover";
 import { MoreHorizontal, Settings as SettingsIcon } from "lucide-react";
 import { ViewToggle } from "../components/ViewToggle";
+import { useIsMobile } from "../lib/platform";
 import { FormatFilter } from "../components/FormatFilter";
 import { useFormatFilter } from "../lib/formatFilter";
 import { NavLink, useNavigate } from "react-router";
@@ -32,6 +33,7 @@ export function Downloads() {
   const [sendModal, setSendModal] = useState<SendModalState | null>(null);
   const [formatFilter] = useFormatFilter();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const filteredItems = items.filter((it) => {
     if (formatFilter === "all") return true;
@@ -174,7 +176,7 @@ export function Downloads() {
       <SendProgressModal state={sendModal} onClose={() => setSendModal(null)} />
       <header className="mb-6 flex items-center justify-between gap-6">
         <div className="flex items-center gap-1">
-          <ViewToggle />
+          {!isMobile && <ViewToggle />}
           <FormatFilter />
         </div>
         <div className="flex items-center gap-2">

@@ -14,8 +14,10 @@ import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialo
 import { ChevronDown, Puzzle } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
 import { checkForUpdate, useUpdateStatus } from "../lib/updateStore";
+import { useIsMobile } from "../lib/platform";
 
 export function Settings() {
+  const isMobile = useIsMobile();
   const [sources, setSources] = useState<Source[]>([]);
   const [downloadDir, setDownloadDir] = useState<string>("");
 
@@ -129,12 +131,14 @@ export function Settings() {
 
   return (
     <div className="mx-auto max-w-5xl px-6 pb-16">
-      <Link
-        to="/library"
-        className="mb-4 inline-block text-xs text-ink-soft hover:text-ink"
-      >
-        ← Library
-      </Link>
+      {!isMobile && (
+        <Link
+          to="/library"
+          className="mb-4 inline-block text-xs text-ink-soft hover:text-ink"
+        >
+          ← Library
+        </Link>
+      )}
       <header className="mb-10">
         <h1 className="font-display text-3xl tracking-tight">Settings</h1>
       </header>

@@ -5,6 +5,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import App from "./App";
 import "./styles.css";
 import { ensureLoaded as ensureEnrichmentLoaded } from "./lib/enrichment";
+import { isMobile } from "./lib/platform";
 
 // Kick off the persistent enrichment cache load in parallel with React mount.
 // `get()` returns localStorage-only data synchronously until the disk read
@@ -24,7 +25,6 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
 // registered causes the first cold-launch mousedown to be lost, which is why
 // dragging used to fail roughly half the time. Mobile WebViews are already
 // visible and the window.show permission isn't granted there.
-const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 async function revealWindow() {
   if (isMobile) return;
   try {

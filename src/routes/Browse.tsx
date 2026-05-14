@@ -6,10 +6,12 @@ import { CategoryTile } from "../components/CategoryTile";
 import { openEntry } from "../lib/entry";
 import { maybeApply as applyEnrichmentToEntry } from "../lib/enrichment";
 import { primaryBadge, formatLabel, isAudiobookEntry } from "../lib/format";
+import { useIsMobile } from "../lib/platform";
 
 export function Browse() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const sourceId = params.get("source") ?? "";
   const href = params.get("href") ?? "";
   const title = params.get("title") ?? "";
@@ -65,12 +67,14 @@ export function Browse() {
 
   return (
     <div className="px-6 pb-16">
-      <button
-        onClick={() => navigate(-1)}
-        className="mb-4 text-xs text-ink-soft hover:text-ink"
-      >
-        ← Back
-      </button>
+      {!isMobile && (
+        <button
+          onClick={() => navigate(-1)}
+          className="mb-4 text-xs text-ink-soft hover:text-ink"
+        >
+          ← Back
+        </button>
+      )}
       <header className="mb-8">
         <h1 className="font-display text-3xl tracking-tight">
           {title || feed?.title || "Browse"}

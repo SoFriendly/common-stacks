@@ -17,6 +17,9 @@ import { ViewToggle } from "../components/ViewToggle";
 import { FormatFilter } from "../components/FormatFilter";
 import { useFormatFilter } from "../lib/formatFilter";
 import { EmptyState } from "../components/EmptyState";
+import { useIsMobile } from "../lib/platform";
+import { useMobileSearch } from "../lib/mobileSearch";
+import { usePullToRefresh } from "../lib/pullToRefresh";
 
 type RailContent =
   | { kind: "entries"; entries: Entry[] }
@@ -81,6 +84,8 @@ export function Library() {
   const searchSeq = useRef(0);
   const navigate = useNavigate();
   const [formatFilter] = useFormatFilter();
+  const isMobile = useIsMobile();
+  const mobileSearch = useMobileSearch();
 
   function matchesFilter(e: Entry): boolean {
     if (formatFilter === "all") return true;
@@ -276,6 +281,20 @@ export function Library() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Bridge the mobile header's search bar into Library's existing search flow.
+  useEffect(() => {
+    if (!isMobile) return;
+    if (mobileSearch.submittedQuery) {
+      setQuery(mobileSearch.submittedQuery);
+      runSearch(mobileSearch.submittedQuery);
+    } else {
+      clearSearch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMobile, mobileSearch.submittedQuery]);
+
+  usePullToRefresh(loadLibrary);
+
   function browse(sourceId: string, href: string, title: string) {
     const params = new URLSearchParams({ source: sourceId, href, title });
     navigate(`/browse?${params.toString()}`);
@@ -284,56 +303,58 @@ export function Library() {
   const showingSearch = searchResult !== null || searching;
 
   return (
-    <div className="px-6 pb-16">
-      <header className="mb-8 flex items-center justify-between gap-6">
-        <div className="flex items-center gap-1">
-          <ViewToggle />
-          <FormatFilter />
-        </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            runSearch(query);
-          }}
-          className="relative w-full max-w-md flex-1"
-        >
-          <SearchIcon className="pointer-events-none absolute top-1/2 left-0 h-4 w-4 -translate-y-1/2 text-ink-soft" />
-          <input
-            value={query}
-            onChange={(e) => {
-              const v = e.currentTarget.value;
-              setQuery(v);
-              if (v.trim() === "") clearSearch();
+    <div className={isMobile ? "px-3 pb-16" : "px-6 pb-16"}>
+      {isMobile ? null : (
+        <header className="mb-8 flex items-center justify-between gap-6">
+          <div className="flex items-center gap-1">
+            <ViewToggle />
+            <FormatFilter />
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              runSearch(query);
             }}
-            placeholder="Search titles, authors, ISBNs…"
-            className="w-full border-0 border-b border-shelf bg-transparent py-2 pr-9 pl-7 font-display text-base text-ink placeholder:text-ink-soft/70 focus:border-spine focus:outline-none focus:ring-0"
-          />
-          {(query || searchResult) && (
-            <button
-              type="button"
-              onClick={clearSearch}
-              aria-label="Clear search"
-              className="absolute top-1/2 right-1 flex h-6 w-6 -translate-y-1/2 items-center justify-center text-ink-soft hover:text-ink"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </form>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={loadLibrary}
-            disabled={refreshing}
-            aria-label="Refresh libraries"
-            title="Refresh"
-            className="flex h-9 w-9 items-center justify-center rounded-md text-ink-soft transition-colors hover:bg-shelf hover:text-ink disabled:opacity-50"
+            className="relative w-full max-w-md flex-1"
           >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-          </button>
-          <IconLink to="/settings" label="Settings">
-            <SettingsIcon className="h-4 w-4" />
-          </IconLink>
-        </div>
-      </header>
+            <SearchIcon className="pointer-events-none absolute top-1/2 left-0 h-4 w-4 -translate-y-1/2 text-ink-soft" />
+            <input
+              value={query}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                setQuery(v);
+                if (v.trim() === "") clearSearch();
+              }}
+              placeholder="Search titles, authors, ISBNs…"
+              className="w-full border-0 border-b border-shelf bg-transparent py-2 pr-9 pl-7 font-display text-base text-ink placeholder:text-ink-soft/70 focus:border-spine focus:outline-none focus:ring-0"
+            />
+            {(query || searchResult) && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                aria-label="Clear search"
+                className="absolute top-1/2 right-1 flex h-6 w-6 -translate-y-1/2 items-center justify-center text-ink-soft hover:text-ink"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </form>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={loadLibrary}
+              disabled={refreshing}
+              aria-label="Refresh libraries"
+              title="Refresh"
+              className="flex h-9 w-9 items-center justify-center rounded-md text-ink-soft transition-colors hover:bg-shelf hover:text-ink disabled:opacity-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            </button>
+            <IconLink to="/settings" label="Settings">
+              <SettingsIcon className="h-4 w-4" />
+            </IconLink>
+          </div>
+        </header>
+      )}
 
       {showingSearch ? (
         <SearchResultsView

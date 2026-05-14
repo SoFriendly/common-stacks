@@ -44,7 +44,7 @@ export function FormatFilter() {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 z-30 mt-1 w-40 overflow-hidden rounded-md border border-shelf bg-paper shadow-lg ring-1 ring-black/10"
+          className="absolute left-0 z-30 mt-1 w-40 overflow-hidden rounded-md border border-shelf bg-paper shadow-lg ring-1 ring-black/10"
         >
           {OPTIONS.map((o) => (
             <button
