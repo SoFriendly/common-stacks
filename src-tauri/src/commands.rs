@@ -300,20 +300,23 @@ pub fn open_download(path: String) -> CmdResult<()> {
             .map_err(err)?;
         return Ok(());
     }
-    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     {
         std::process::Command::new("xdg-open")
             .arg(&path)
             .spawn()
             .map_err(err)?;
-        Ok(())
+        return Ok(());
+    }
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    {
+        let _ = path;
+        Err("Opening files in an external app is not yet supported on mobile.".into())
     }
 }
 
 #[tauri::command]
 pub fn reveal_download(path: String) -> CmdResult<()> {
-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
-    let p = std::path::PathBuf::from(&path);
     #[cfg(target_os = "macos")]
     {
         std::process::Command::new("open")
@@ -330,14 +333,20 @@ pub fn reveal_download(path: String) -> CmdResult<()> {
             .map_err(err)?;
         return Ok(());
     }
-    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     {
+        let p = std::path::PathBuf::from(&path);
         let dir = p.parent().ok_or_else(|| "no parent".to_string())?;
         std::process::Command::new("xdg-open")
             .arg(dir)
             .spawn()
             .map_err(err)?;
-        Ok(())
+        return Ok(());
+    }
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    {
+        let _ = path;
+        Err("Revealing files in a file manager is not supported on mobile.".into())
     }
 }
 
@@ -478,32 +487,44 @@ pub fn plugins_dir() -> CmdResult<String> {
 
 #[tauri::command]
 pub fn reveal_plugins_dir() -> CmdResult<()> {
-    let dir = crate::plugins::loader::plugins_dir();
-    std::fs::create_dir_all(&dir).map_err(err)?;
-    let path = dir.to_string_lossy().to_string();
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "ios", target_os = "android"))]
     {
-        std::process::Command::new("open")
-            .arg(&path)
-            .spawn()
-            .map_err(err)?;
-        return Ok(());
+        return Err("User plugins are not available on mobile in this release.".into());
     }
-    #[cfg(target_os = "windows")]
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
     {
-        std::process::Command::new("explorer")
-            .arg(&path)
-            .spawn()
-            .map_err(err)?;
-        return Ok(());
-    }
-    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
-    {
-        std::process::Command::new("xdg-open")
-            .arg(&path)
-            .spawn()
-            .map_err(err)?;
-        Ok(())
+        let dir = crate::plugins::loader::plugins_dir();
+        std::fs::create_dir_all(&dir).map_err(err)?;
+        let path = dir.to_string_lossy().to_string();
+        #[cfg(target_os = "macos")]
+        {
+            std::process::Command::new("open")
+                .arg(&path)
+                .spawn()
+                .map_err(err)?;
+            return Ok(());
+        }
+        #[cfg(target_os = "windows")]
+        {
+            std::process::Command::new("explorer")
+                .arg(&path)
+                .spawn()
+                .map_err(err)?;
+            return Ok(());
+        }
+        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
+        {
+            std::process::Command::new("xdg-open")
+                .arg(&path)
+                .spawn()
+                .map_err(err)?;
+            return Ok(());
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux", target_os = "freebsd")))]
+        {
+            let _ = path;
+            Err("Unsupported platform".into())
+        }
     }
 }
 
@@ -618,12 +639,12 @@ pub async fn fetch_kindle_relay_info(send_url: String) -> CmdResult<RelayInfo> {
         return Err("invalid relay URL".into());
     };
 
-    let client = reqwest::Client::builder()
+    let builder = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))
-        .user_agent("Common Stacks/0.1")
-        .hickory_dns(true)
-        .build()
-        .map_err(err)?;
+        .user_agent("Common Stacks/0.1");
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    let builder = builder.hickory_dns(true);
+    let client = builder.build().map_err(err)?;
     let resp = client.get(&info_url).send().await.map_err(err)?;
     if !resp.status().is_success() {
         return Err(format!("relay returned HTTP {}", resp.status()));

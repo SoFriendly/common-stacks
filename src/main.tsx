@@ -22,8 +22,11 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
 // Reveal the window only after the React tree has been wired up — including
 // Tauri's drag-region attribute. Showing the window before the listeners are
 // registered causes the first cold-launch mousedown to be lost, which is why
-// dragging used to fail roughly half the time.
+// dragging used to fail roughly half the time. Mobile WebViews are already
+// visible and the window.show permission isn't granted there.
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 async function revealWindow() {
+  if (isMobile) return;
   try {
     const w = getCurrentWindow();
     await w.show();
@@ -32,9 +35,9 @@ async function revealWindow() {
     console.error("revealWindow failed", err);
   }
 }
-requestAnimationFrame(() => {
-  requestAnimationFrame(revealWindow);
-});
-// Safety net: if for any reason the rAF chain doesn't run, still show
-// the window after a short delay so we never end up invisible forever.
-setTimeout(revealWindow, 500);
+if (!isMobile) {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(revealWindow);
+  });
+  setTimeout(revealWindow, 500);
+}

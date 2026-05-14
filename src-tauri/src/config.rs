@@ -1,6 +1,45 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::OnceLock;
+
+use tauri::Manager;
+
+#[derive(Debug, Clone)]
+struct Paths {
+    config_dir: PathBuf,
+    default_download_dir: PathBuf,
+}
+
+static PATHS: OnceLock<Paths> = OnceLock::new();
+
+/// Initialise platform-correct config / download paths from the Tauri AppHandle.
+/// Must be called once during `setup`, before any path accessor is used.
+pub fn init_paths<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> anyhow::Result<()> {
+    let path = app.path();
+    let config_dir = if cfg!(any(target_os = "ios", target_os = "android")) {
+        path.app_local_data_dir()
+            .map_err(|e| anyhow::anyhow!("app_local_data_dir: {}", e))?
+    } else {
+        dirs::config_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("Common Stacks")
+    };
+    let default_download_dir = if cfg!(any(target_os = "ios", target_os = "android")) {
+        path.app_data_dir()
+            .map_err(|e| anyhow::anyhow!("app_data_dir: {}", e))?
+            .join("Books")
+    } else if let Some(home) = dirs::home_dir() {
+        home.join("Books").join("Common Stacks")
+    } else {
+        PathBuf::from("Common Stacks")
+    };
+    let _ = PATHS.set(Paths {
+        config_dir,
+        default_download_dir,
+    });
+    Ok(())
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -71,6 +110,9 @@ pub struct Config {
 }
 
 pub fn config_dir() -> PathBuf {
+    if let Some(p) = PATHS.get() {
+        return p.config_dir.clone();
+    }
     let base = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
     base.join("Common Stacks")
 }
@@ -80,6 +122,9 @@ pub fn config_path() -> PathBuf {
 }
 
 pub fn default_download_dir() -> PathBuf {
+    if let Some(p) = PATHS.get() {
+        return p.default_download_dir.clone();
+    }
     if let Some(home) = dirs::home_dir() {
         home.join("Books").join("Common Stacks")
     } else {
