@@ -8,6 +8,8 @@ import {
 import { DefaultCover } from "../components/DefaultCover";
 import { MoreHorizontal, Settings as SettingsIcon } from "lucide-react";
 import { ViewToggle } from "../components/ViewToggle";
+import { FormatFilter } from "../components/FormatFilter";
+import { useFormatFilter } from "../lib/formatFilter";
 import { NavLink, useNavigate } from "react-router";
 import {
   SendProgressModal,
@@ -28,7 +30,14 @@ export function Downloads() {
   const [view, setView] = useState<View>("grid");
   const [sendTargets, setSendTargets] = useState<SendTargetInfo[]>([]);
   const [sendModal, setSendModal] = useState<SendModalState | null>(null);
+  const [formatFilter] = useFormatFilter();
   const navigate = useNavigate();
+
+  const filteredItems = items.filter((it) => {
+    if (formatFilter === "all") return true;
+    const isAudio = badgeForExtension(it.file.extension) === "Audiobook";
+    return formatFilter === "audiobooks" ? isAudio : !isAudio;
+  });
 
   useEffect(() => {
     api.listSendTargets().then(setSendTargets);
@@ -164,7 +173,10 @@ export function Downloads() {
     <div className="px-6 pb-16">
       <SendProgressModal state={sendModal} onClose={() => setSendModal(null)} />
       <header className="mb-6 flex items-center justify-between gap-6">
-        <ViewToggle />
+        <div className="flex items-center gap-1">
+          <ViewToggle />
+          <FormatFilter />
+        </div>
         <div className="flex items-center gap-2">
           <div className="mr-2 flex overflow-hidden rounded-md bg-shelf/60 p-0.5 text-sm">
             <button
@@ -195,20 +207,27 @@ export function Downloads() {
         </div>
       </header>
 
-      {items.length === 0 ? (
-        <EmptyState
-          title="No books here yet"
-          description={
-            <>
-              Downloaded books land in your Common Stacks folder. Browse a
-              library, open a book, and pick a format to start your shelf.
-            </>
-          }
-          primary={{ label: "Browse the library", onClick: () => navigate("/library") }}
-        />
+      {filteredItems.length === 0 ? (
+        items.length === 0 ? (
+          <EmptyState
+            title="No books here yet"
+            description={
+              <>
+                Downloaded books land in your Common Stacks folder. Browse a
+                library, open a book, and pick a format to start your shelf.
+              </>
+            }
+            primary={{ label: "Browse the library", onClick: () => navigate("/library") }}
+          />
+        ) : (
+          <p className="text-sm text-ink-soft">
+            No {formatFilter === "audiobooks" ? "audiobooks" : "books"} in your
+            downloads.
+          </p>
+        )
       ) : view === "grid" ? (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-x-5 gap-y-10">
-          {items.map((it) => (
+          {filteredItems.map((it) => (
             <DownloadGridCard
               key={it.file.path}
               item={it}
@@ -223,7 +242,7 @@ export function Downloads() {
         </div>
       ) : (
         <DownloadList
-          items={items}
+          items={filteredItems}
           onOpen={handleOpen}
           onReveal={handleReveal}
           onRename={handleRename}

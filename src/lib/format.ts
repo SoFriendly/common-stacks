@@ -73,6 +73,12 @@ export function isAudiobookEntry(e: Pick<Entry, "acquisitions">): boolean {
   return entryFormats(e).includes("audiobook");
 }
 
+/** True if the entry has any non-audiobook acquisition (epub/pdf/comic/other). */
+export function hasBookFormat(e: Pick<Entry, "acquisitions">): boolean {
+  const formats = entryFormats(e);
+  return formats.some((f) => f !== "audiobook");
+}
+
 export function formatLabel(kind: FormatKind): string {
   switch (kind) {
     case "epub":

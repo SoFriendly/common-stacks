@@ -6,7 +6,7 @@ import { CategoryTile } from "../components/CategoryTile";
 import { Rail } from "../components/Rail";
 import { openEntry } from "../lib/entry";
 import { maybeApply as applyEnrichmentToEntry } from "../lib/enrichment";
-import { primaryBadge, formatLabel, isAudiobookEntry } from "../lib/format";
+import { primaryBadge, formatLabel, isAudiobookEntry, hasBookFormat } from "../lib/format";
 import {
   Search as SearchIcon,
   X,
@@ -14,6 +14,8 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { ViewToggle } from "../components/ViewToggle";
+import { FormatFilter } from "../components/FormatFilter";
+import { useFormatFilter } from "../lib/formatFilter";
 import { EmptyState } from "../components/EmptyState";
 
 type RailContent =
@@ -78,6 +80,13 @@ export function Library() {
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   const searchSeq = useRef(0);
   const navigate = useNavigate();
+  const [formatFilter] = useFormatFilter();
+
+  function matchesFilter(e: Entry): boolean {
+    if (formatFilter === "all") return true;
+    if (formatFilter === "audiobooks") return isAudiobookEntry(e);
+    return hasBookFormat(e);
+  }
 
   async function runSearch(q: string) {
     const trimmed = q.trim();
@@ -277,7 +286,10 @@ export function Library() {
   return (
     <div className="px-6 pb-16">
       <header className="mb-8 flex items-center justify-between gap-6">
-        <ViewToggle />
+        <div className="flex items-center gap-1">
+          <ViewToggle />
+          <FormatFilter />
+        </div>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -328,6 +340,7 @@ export function Library() {
           query={query}
           searching={searching}
           result={searchResult}
+          filter={matchesFilter}
           onOpen={(book) => openMergedBook(navigate, book)}
         />
       ) : (
@@ -394,7 +407,7 @@ export function Library() {
                 ))}
 
               {!rail.loading && rail.content?.kind === "entries" &&
-                rail.content.entries.slice(0, 24).map((raw) => {
+                rail.content.entries.filter(matchesFilter).slice(0, 24).map((raw) => {
                   // Apply cached enrichment at render time so books that get
                   // enriched after the Library rail was fetched still surface
                   // the new cover/author data without waiting for a refresh.
@@ -434,6 +447,14 @@ export function Library() {
                 rail.content?.kind === "entries" &&
                 rail.content.entries.length === 0 && (
                   <p className="text-sm text-ink-soft">Empty.</p>
+                )}
+              {!rail.loading &&
+                rail.content?.kind === "entries" &&
+                rail.content.entries.length > 0 &&
+                rail.content.entries.filter(matchesFilter).length === 0 && (
+                  <p className="text-sm text-ink-soft">
+                    No {formatFilter === "audiobooks" ? "audiobooks" : "books"} here.
+                  </p>
                 )}
               {!rail.loading &&
                 rail.content?.kind === "categories" &&
@@ -476,11 +497,13 @@ function SearchResultsView({
   query,
   searching,
   result,
+  filter,
   onOpen,
 }: {
   query: string;
   searching: boolean;
   result: SearchResult | null;
+  filter: (e: Entry) => boolean;
   onOpen: (book: MergedBook) => void;
 }) {
   if (searching && !result) {
@@ -509,8 +532,10 @@ function SearchResultsView({
           </span>
         </div>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-x-5 gap-y-8">
-          {result.merged.map((b) => {
-            const enriched = applyEnrichmentToEntry(mergedBookAsEntry(b));
+          {result.merged
+            .map((b) => ({ b, enriched: applyEnrichmentToEntry(mergedBookAsEntry(b)) }))
+            .filter(({ enriched }) => filter(enriched))
+            .map(({ b, enriched }) => {
             const badge = primaryBadge(enriched);
             return (
               <div key={b.key} className="flex flex-col">
