@@ -4,10 +4,9 @@
  */
 export function tap(ms = 10): void {
   if (typeof navigator === "undefined") return;
-  const vibrate = (navigator as Navigator).vibrate;
-  if (typeof vibrate !== "function") return;
+  if (typeof navigator.vibrate !== "function") return;
   try {
-    vibrate.call(navigator, ms);
+    navigator.vibrate(ms);
   } catch {
     // ignored
   }

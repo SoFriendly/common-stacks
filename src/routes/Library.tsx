@@ -293,7 +293,9 @@ export function Library() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMobile, mobileSearch.submittedQuery]);
 
-  usePullToRefresh(loadLibrary);
+  usePullToRefresh(() => {
+    loadLibrary();
+  });
 
   function browse(sourceId: string, href: string, title: string) {
     const params = new URLSearchParams({ source: sourceId, href, title });
