@@ -29,6 +29,9 @@ bun-debug.log*
 *.key
 *.key.pub
 .tauri/
+*.jks
+*.keystore
+src-tauri/gen/android/signing.properties
 
 # Release artifacts
 artifacts/
