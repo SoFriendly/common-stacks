@@ -140,7 +140,7 @@ impl SendTarget for KindleCloudflareTarget {
             author: req.author.as_deref(),
         };
 
-        let client = reqwest::Client::builder()
+        let client = crate::tls::client_builder()
             .timeout(std::time::Duration::from_secs(120))
             .user_agent("Common Stacks/0.1")
             .build()?;

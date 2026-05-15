@@ -138,7 +138,13 @@ pub async fn fetch_feed(
         .find(|s| s.id == source_id)
         .ok_or_else(|| format!("unknown source: {}", source_id))?;
     let target = url.unwrap_or_else(|| source.url.clone());
-    let feed = state.client.fetch_feed(&source, &target).await.map_err(err)?;
+    let feed = match state.client.fetch_feed(&source, &target).await {
+        Ok(f) => f,
+        Err(e) => {
+            tracing::warn!("fetch_feed failed (source={}, url={}): {:?}", source.id, target, e);
+            return Err(err(e));
+        }
+    };
     Ok(FetchResult {
         source_id: source.id,
         feed,
@@ -639,7 +645,7 @@ pub async fn fetch_kindle_relay_info(send_url: String) -> CmdResult<RelayInfo> {
         return Err("invalid relay URL".into());
     };
 
-    let builder = reqwest::Client::builder()
+    let builder = crate::tls::client_builder()
         .timeout(std::time::Duration::from_secs(15))
         .user_agent("Common Stacks/0.1");
     #[cfg(not(any(target_os = "ios", target_os = "android")))]

@@ -35,7 +35,7 @@ impl OpdsClient {
             USER_AGENT,
             HeaderValue::from_static("Common Stacks/0.1 (+https://github.com/jmitch)"),
         );
-        let http = reqwest::Client::builder()
+        let http = crate::tls::client_builder()
             .default_headers(headers)
             .timeout(Duration::from_secs(60))
             .connect_timeout(Duration::from_secs(15))
@@ -115,7 +115,7 @@ impl OpdsClient {
         // redirects (e.g. Mayberry → faraway.branch.pub). Use a per-request
         // client with a generous total timeout but a tight connect timeout so
         // we fail fast on unreachable hosts.
-        let client = reqwest::Client::builder()
+        let client = crate::tls::client_builder()
             .default_headers({
                 let mut h = reqwest::header::HeaderMap::new();
                 h.insert(

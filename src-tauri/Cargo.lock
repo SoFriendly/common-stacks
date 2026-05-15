@@ -562,6 +562,7 @@ dependencies = [
  "once_cell",
  "quick-xml",
  "reqwest",
+ "rustls",
  "rustls-platform-verifier",
  "sanitize-filename",
  "serde",
@@ -577,6 +578,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
+ "webpki-root-certs",
  "zip 8.6.0",
 ]
 

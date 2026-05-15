@@ -131,7 +131,7 @@ impl SendTarget for CrosspointTarget {
         let base = format!("http://{}:{}", host, port);
         ctx.emit(SendProgress::stage("connecting", format!("Looking for {}…", host)));
 
-        let client = reqwest::Client::builder()
+        let client = crate::tls::client_builder()
             .timeout(std::time::Duration::from_secs(600))
             .connect_timeout(std::time::Duration::from_secs(8))
             .user_agent("Common Stacks/0.1")

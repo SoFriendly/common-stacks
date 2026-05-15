@@ -75,7 +75,7 @@ impl SendTarget for WebDavTarget {
 
         let bytes = tokio::fs::read(&req.file_path).await?;
 
-        let client = reqwest::Client::builder()
+        let client = crate::tls::client_builder()
             .timeout(std::time::Duration::from_secs(120))
             .user_agent("Common Stacks/0.1")
             .build()?;

@@ -11,7 +11,7 @@ pub struct OpenLibraryEnricher {
 
 impl OpenLibraryEnricher {
     pub fn new() -> Self {
-        let http = reqwest::Client::builder()
+        let http = crate::tls::client_builder()
             .timeout(std::time::Duration::from_secs(10))
             .user_agent("Common Stacks/0.1 (+https://github.com/jmitch)")
             .build()

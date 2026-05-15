@@ -6,6 +6,7 @@ mod epub;
 mod opds;
 mod plugins;
 mod state;
+mod tls;
 
 use state::AppState;
 use tauri::Manager;
