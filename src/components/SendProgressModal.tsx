@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { CheckCircle2, AlertTriangle, Loader2, X } from "lucide-react";
 import type { SendProgress, SendTargetInfo } from "../lib/api";
 
@@ -36,7 +37,7 @@ export function SendProgressModal({ state, onClose }: Props) {
       ? Math.round((latest.current / latest.total) * 100)
       : null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={() => {
@@ -143,6 +144,7 @@ export function SendProgressModal({ state, onClose }: Props) {
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
