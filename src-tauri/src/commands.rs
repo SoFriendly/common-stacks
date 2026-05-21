@@ -645,12 +645,11 @@ pub async fn fetch_kindle_relay_info(send_url: String) -> CmdResult<RelayInfo> {
         return Err("invalid relay URL".into());
     };
 
-    let builder = crate::tls::client_builder()
+    let client = crate::tls::client_builder()
         .timeout(std::time::Duration::from_secs(15))
-        .user_agent("Common Stacks/0.1");
-    #[cfg(not(any(target_os = "ios", target_os = "android")))]
-    let builder = builder.hickory_dns(true);
-    let client = builder.build().map_err(err)?;
+        .user_agent("Common Stacks/0.1")
+        .build()
+        .map_err(err)?;
     let resp = client.get(&info_url).send().await.map_err(err)?;
     if !resp.status().is_success() {
         return Err(format!("relay returned HTTP {}", resp.status()));
