@@ -41,6 +41,15 @@ interface SendResponse {
 
 const MAX_BODY_BYTES = 5 * 1024 * 1024; // Cloudflare Email Service total cap.
 
+// User-facing failure messages. Anything that's really an operator/config
+// problem (domain not cleared to send, upstream error, etc.) maps to the
+// generic message — the actionable detail is logged via console.error for us,
+// never shown to the reader.
+const GENERIC_SEND_FAILURE =
+  "Couldn't send this book to your Kindle right now. Please try again in a little while.";
+const BOUNCE_FAILURE =
+  "Couldn't deliver to that Kindle address. Double-check the address is correct and that Common Stacks is on your Amazon “Approved Personal Document E-mail List.”";
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -129,20 +138,11 @@ export default {
         const parsed = JSON.parse(cfText);
         if (parsed && parsed.success === false) {
           console.error("cloudflare reported success=false", cfText);
-          return json(
-            {
-              ok: false,
-              message: `Cloudflare Email Service rejected the message: ${truncate(
-                cfText,
-                400,
-              )}`,
-            },
-            502,
-          );
+          return json({ ok: false, message: GENERIC_SEND_FAILURE }, 502);
         }
-        // `success: true` can still mean "accepted but went nowhere" when
-        // the sending domain isn't fully verified. Treat empty delivered +
-        // empty queued as a real failure so the user sees something.
+        // `success: true` can still mean "accepted but went nowhere" — e.g. a
+        // permanent bounce, or the account/domain not being cleared to send.
+        // Treat empty delivered + empty queued as a real failure.
         const result = parsed?.result ?? {};
         const delivered = Array.isArray(result.delivered) ? result.delivered : [];
         const queued = Array.isArray(result.queued) ? result.queued : [];
@@ -150,20 +150,12 @@ export default {
           ? result.permanent_bounces
           : [];
         if (delivered.length === 0 && queued.length === 0) {
+          if (bounces.length > 0) {
+            console.error("permanent bounce", cfText);
+            return json({ ok: false, message: BOUNCE_FAILURE }, 502);
+          }
           console.error("cloudflare accepted but didn't send", cfText);
-          return json(
-            {
-              ok: false,
-              message:
-                bounces.length > 0
-                  ? `Amazon rejected the message: ${JSON.stringify(bounces).slice(
-                      0,
-                      400,
-                    )}`
-                  : "Cloudflare Email Service accepted the request but didn't deliver or queue it. The sending domain is most likely not fully verified — check DKIM/SPF/DMARC in the Cloudflare dashboard's Email Sending settings.",
-            },
-            502,
-          );
+          return json({ ok: false, message: GENERIC_SEND_FAILURE }, 502);
         }
       } catch {
         // body isn't json — fine, the 2xx status alone is enough
@@ -172,16 +164,7 @@ export default {
     }
 
     console.error("cloudflare email send failed", cfRes.status, cfText);
-    return json(
-      {
-        ok: false,
-        message: `Cloudflare Email Service returned ${cfRes.status}: ${truncate(
-          cfText,
-          400,
-        )}`,
-      },
-      502,
-    );
+    return json({ ok: false, message: GENERIC_SEND_FAILURE }, 502);
   },
 };
 

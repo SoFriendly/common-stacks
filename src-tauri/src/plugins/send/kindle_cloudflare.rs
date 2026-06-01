@@ -172,15 +172,15 @@ impl SendTarget for KindleCloudflareTarget {
                  rebuild from source with the latest workers/kindle/.env present."
             ))
         } else {
-            Err(anyhow!(
-                "Relay returned {}: {}",
-                status,
-                if message.is_empty() {
-                    "no error body".into()
-                } else {
-                    message
-                }
-            ))
+            // Surface the relay's user-facing message as-is; it's already
+            // written for the reader. Fall back to a generic line (never the
+            // raw HTTP status) if the relay didn't send one.
+            Err(anyhow!(if message.is_empty() {
+                "Couldn't send this book to your Kindle right now. Please try again in a little while."
+                    .to_string()
+            } else {
+                message
+            }))
         }
     }
 }
