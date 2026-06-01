@@ -84,16 +84,17 @@ export default {
     const subject = formatSubject(payload);
     const fromEmail = env.SENDER_EMAIL;
     const fromName = env.SENDER_NAME ?? "Common Stacks";
-    // Cloudflare Email Service accepts `from` as either a raw RFC 5322
-    // mailbox string ("Name <addr>") or an object with `address` + `name`
-    // keys. Sticking with the string form to keep the schema unambiguous.
-    const fromHeader = fromName
-      ? `${fromName} <${fromEmail}>`
-      : fromEmail;
+    // Cloudflare Email Service expects `from` as a bare address string or an
+    // object with `address` + `name`. The RFC 5322 "Name <addr>" string form
+    // is NOT parsed as a mailbox — Cloudflare treats the whole string as the
+    // literal address, it fails to match the verified sending identity, and
+    // the message is silently dropped (success:true, delivered/queued empty).
+    // Use the object form so the address is unambiguous.
+    const from = fromName ? { address: fromEmail, name: fromName } : fromEmail;
 
     const cfBody = {
       to: payload.kindle_address,
-      from: fromHeader,
+      from,
       subject,
       text: "Sent via Common Stacks.",
       attachments: [
