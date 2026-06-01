@@ -140,22 +140,19 @@ export default {
           console.error("cloudflare reported success=false", cfText);
           return json({ ok: false, message: GENERIC_SEND_FAILURE }, 502);
         }
-        // `success: true` can still mean "accepted but went nowhere" — e.g. a
-        // permanent bounce, or the account/domain not being cleared to send.
-        // Treat empty delivered + empty queued as a real failure.
+        // NOTE: Cloudflare's send API returns `success: true` with EMPTY
+        // `delivered` and `queued` arrays even when the message is accepted and
+        // goes on to deliver — those arrays are not populated synchronously
+        // (confirmed: a send reporting `delivered: []` still landed in the
+        // inbox). So empty arrays are normal and mean "accepted". The only
+        // real failure signalled in a 2xx body is a permanent bounce.
         const result = parsed?.result ?? {};
-        const delivered = Array.isArray(result.delivered) ? result.delivered : [];
-        const queued = Array.isArray(result.queued) ? result.queued : [];
         const bounces = Array.isArray(result.permanent_bounces)
           ? result.permanent_bounces
           : [];
-        if (delivered.length === 0 && queued.length === 0) {
-          if (bounces.length > 0) {
-            console.error("permanent bounce", cfText);
-            return json({ ok: false, message: BOUNCE_FAILURE }, 502);
-          }
-          console.error("cloudflare accepted but didn't send", cfText);
-          return json({ ok: false, message: GENERIC_SEND_FAILURE }, 502);
+        if (bounces.length > 0) {
+          console.error("permanent bounce", cfText);
+          return json({ ok: false, message: BOUNCE_FAILURE }, 502);
         }
       } catch {
         // body isn't json — fine, the 2xx status alone is enough
