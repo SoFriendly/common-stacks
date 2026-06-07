@@ -140,8 +140,10 @@ if ($cert -and $env:TAURI_WINDOWS_SIGNTOOL_PATH) {
     Write-Host ""
     Write-Host "Signing installers with signtool..." -ForegroundColor Cyan
     $toSign = @()
-    $toSign += Get-ChildItem -Path "$bundleRoot\nsis\*-setup.exe" -ErrorAction SilentlyContinue
-    $toSign += Get-ChildItem -Path "$bundleRoot\msi\*.msi" -ErrorAction SilentlyContinue
+    # Filter by $VERSION so stale installers from earlier builds in the same
+    # bundle directory don't get re-signed every time.
+    $toSign += Get-ChildItem -Path "$bundleRoot\nsis\*${VERSION}*-setup.exe" -ErrorAction SilentlyContinue
+    $toSign += Get-ChildItem -Path "$bundleRoot\msi\*${VERSION}*.msi" -ErrorAction SilentlyContinue
     foreach ($f in $toSign) {
         Write-Host "  signing $($f.Name)"
         & $env:TAURI_WINDOWS_SIGNTOOL_PATH sign /sha1 $cert.Thumbprint /fd SHA256 /tr http://timestamp.sectigo.com /td SHA256 $f.FullName
@@ -153,6 +155,31 @@ Write-Host ""
 Write-Host "Artifacts in: $bundleRoot" -ForegroundColor Green
 Get-ChildItem -Path "$bundleRoot\msi" -ErrorAction SilentlyContinue
 Get-ChildItem -Path "$bundleRoot\nsis" -ErrorAction SilentlyContinue
+
+# ── Auto-commit + tag (only when this run bumped the version) ───────────────
+# Only the version files are staged so any unrelated WIP stays untouched.
+if ($Bump -ne "--no-bump") {
+    $tagExists = $false
+    & git rev-parse "v$VERSION" 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) { $tagExists = $true }
+
+    if ($tagExists) {
+        Write-Host "(tag v$VERSION already exists — skipping commit + tag)"
+    } else {
+        Write-Host ""
+        Write-Host "=== Committing version bump ===" -ForegroundColor Cyan
+        & git add src-tauri\tauri.conf.json src-tauri\Cargo.toml src-tauri\Cargo.lock package.json
+        & git commit -m "Release v$VERSION"
+        & git tag -a "v$VERSION" -m "Release v$VERSION"
+        if ($Upload) {
+            $branch = (& git branch --show-current).Trim()
+            & git push origin $branch
+            & git push origin "v$VERSION"
+        } else {
+            Write-Host "(skipped git push — pass -Upload to push commit + tag)"
+        }
+    }
+}
 
 if ($Upload) {
     Write-Host ""
