@@ -10,6 +10,7 @@ import {
   Download,
   Send,
   Globe,
+  ChevronDown,
 } from "lucide-react";
 
 function Logo({ className }: { className?: string }) {
@@ -54,6 +55,8 @@ export function Landing() {
 }
 
 function SiteHeader() {
+  const [open, setOpen] = useState(false);
+
   return (
     <header className="sticky top-0 z-40 border-b border-shelf/70 bg-paper/85 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
@@ -61,13 +64,51 @@ function SiteHeader() {
           <Logo className="h-5 w-5" />
           Common Stacks
         </a>
-        <a
-          href="#download"
-          className="inline-flex items-center gap-1.5 rounded-md bg-ink px-3.5 py-1.5 text-sm text-paper transition-opacity hover:opacity-90"
-        >
-          <Download className="h-3.5 w-3.5" />
-          Download
-        </a>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={open}
+            className="inline-flex items-center gap-1.5 rounded-md bg-ink px-3.5 py-1.5 text-sm text-paper transition-opacity hover:opacity-90"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Download
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+          </button>
+          {open && (
+            <>
+              <button
+                type="button"
+                aria-hidden
+                tabIndex={-1}
+                className="fixed inset-0 z-0 cursor-default"
+                onClick={() => setOpen(false)}
+              />
+              <div
+                role="menu"
+                className="absolute right-0 z-10 mt-2 w-44 overflow-hidden rounded-md border border-shelf bg-paper shadow-lg"
+              >
+                <a
+                  href="https://releases.commonstacks.com/commonstacks-latest.dmg"
+                  role="menuitem"
+                  onClick={() => setOpen(false)}
+                  className="block px-4 py-2.5 text-sm text-ink transition-colors hover:bg-shelf"
+                >
+                  Download for macOS
+                </a>
+                <a
+                  href="https://releases.commonstacks.com/commonstacks-latest.exe"
+                  role="menuitem"
+                  onClick={() => setOpen(false)}
+                  className="block border-t border-shelf/70 px-4 py-2.5 text-sm text-ink transition-colors hover:bg-shelf"
+                >
+                  Download for Windows
+                </a>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </header>
   );
