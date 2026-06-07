@@ -309,11 +309,11 @@ impl SendTarget for SubprocessSendTarget {
 // Transformer
 // -------------------------------------------------------------------------
 
+#[allow(dead_code)]
 struct SubprocessTransformer {
     manifest: Arc<PluginManifest>,
     exe_path: PathBuf,
     schema: Vec<SettingField>,
-    #[allow(dead_code)]
     applies_to: Vec<String>,
     applies_to_static: Vec<&'static str>,
 }
@@ -355,6 +355,7 @@ impl SubprocessTransformer {
 }
 
 #[derive(Serialize)]
+#[allow(dead_code)]
 struct TransformInvocation<'a> {
     settings: &'a HashMap<String, String>,
     input_path: &'a str,

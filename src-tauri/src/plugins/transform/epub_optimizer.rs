@@ -95,6 +95,7 @@ impl Transformer for EpubOptimizer {
 /// Standalone entry point so send targets (e.g. Crosspoint) can call the
 /// optimizer directly from their own toggle without going through the
 /// plugin registry. Always runs the heavy work on a blocking thread.
+#[allow(dead_code)]
 pub async fn run(input: Vec<u8>, quality: u8) -> Result<Vec<u8>> {
     run_with_progress(input, quality, None).await
 }
