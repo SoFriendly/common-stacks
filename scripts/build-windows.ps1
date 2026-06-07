@@ -134,22 +134,11 @@ Write-Host "Building Tauri app (NSIS + MSI)..." -ForegroundColor Cyan
 bunx @tauri-apps/cli build
 if ($LASTEXITCODE -ne 0) { Write-Error "tauri build failed"; exit 1 }
 
-# ── Post-build signtool pass (if cert present) ──────────────────────────────
+# Authenticode signing happens inside the Tauri bundle step via the
+# bundle.windows.certificateThumbprint setting in tauri.windows.conf.json,
+# so the updater .sig is computed against the already-signed binary.
+# Don't re-sign here — that would invalidate the .sig.
 $bundleRoot = "src-tauri\target\release\bundle"
-if ($cert -and $env:TAURI_WINDOWS_SIGNTOOL_PATH) {
-    Write-Host ""
-    Write-Host "Signing installers with signtool..." -ForegroundColor Cyan
-    $toSign = @()
-    # Filter by $VERSION so stale installers from earlier builds in the same
-    # bundle directory don't get re-signed every time.
-    $toSign += Get-ChildItem -Path "$bundleRoot\nsis\*${VERSION}*-setup.exe" -ErrorAction SilentlyContinue
-    $toSign += Get-ChildItem -Path "$bundleRoot\msi\*${VERSION}*.msi" -ErrorAction SilentlyContinue
-    foreach ($f in $toSign) {
-        Write-Host "  signing $($f.Name)"
-        & $env:TAURI_WINDOWS_SIGNTOOL_PATH sign /sha1 $cert.Thumbprint /fd SHA256 /tr http://timestamp.sectigo.com /td SHA256 $f.FullName
-        if ($LASTEXITCODE -ne 0) { Write-Warning "signtool failed for $($f.Name)" }
-    }
-}
 
 Write-Host ""
 Write-Host "Artifacts in: $bundleRoot" -ForegroundColor Green
