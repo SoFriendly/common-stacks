@@ -11,6 +11,7 @@
     "snapshot:landing": "bun run scripts/snapshot-landing.ts",
     "dev:landing": "vite --open /landing.html",
     "build:landing": "BUILD_TARGET=landing tsc && BUILD_TARGET=landing vite build && mv dist-landing/landing.html dist-landing/index.html",
+    "preview:landing": "vite preview --outDir dist-landing",
     "deploy:landing": "bun run build:landing && wrangler deploy --config workers/landing/wrangler.toml"
   },
   "dependencies": {
