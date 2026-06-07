@@ -8,7 +8,7 @@ import {
 import { DefaultCover } from "../components/DefaultCover";
 import { MoreHorizontal, Settings as SettingsIcon } from "lucide-react";
 import { ViewToggle } from "../components/ViewToggle";
-import { useIsMobile } from "../lib/platform";
+import { useIsMobile, revealLabel } from "../lib/platform";
 import { FormatFilter } from "../components/FormatFilter";
 import { useFormatFilter } from "../lib/formatFilter";
 import { NavLink, useNavigate } from "react-router";
@@ -389,7 +389,7 @@ function DownloadGridCard({
                     t.enabled &&
                     !(t.schema.some((f) => f.required) && !t.configured),
                 ) && <div className="my-1 border-t border-shelf" />}
-              <MenuItem onClick={withClose(onReveal)}>Reveal in Finder</MenuItem>
+              <MenuItem onClick={withClose(onReveal)}>{revealLabel}</MenuItem>
               <MenuItem onClick={withClose(onRename)}>Rename…</MenuItem>
               <MenuItem onClick={withClose(onDelete)} danger>
                 Delete

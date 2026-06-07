@@ -23,3 +23,23 @@ export function useIsMobile(): boolean {
   const [value] = useState(matchesMobile);
   return value;
 }
+
+function detectDesktopOS(): "macos" | "windows" | "linux" | "other" {
+  if (typeof navigator === "undefined") return "other";
+  const ua = navigator.userAgent;
+  if (/Windows/i.test(ua)) return "windows";
+  if (/Macintosh|Mac OS X/i.test(ua)) return "macos";
+  if (/Linux/i.test(ua)) return "linux";
+  return "other";
+}
+
+export const desktopOS = detectDesktopOS();
+
+// Label for the file-manager reveal action — Finder on macOS, Explorer on
+// Windows, generic elsewhere.
+export const revealLabel =
+  desktopOS === "windows"
+    ? "Show in Explorer"
+    : desktopOS === "linux"
+      ? "Show in File Manager"
+      : "Reveal in Finder";
