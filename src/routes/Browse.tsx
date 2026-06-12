@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { api, type Feed } from "../lib/api";
 import { CoverCard } from "../components/CoverCard";
@@ -19,6 +19,8 @@ export function Browse() {
   const [feed, setFeed] = useState<Feed | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadingMoreRef = useRef(false);
 
   useEffect(() => {
     if (!sourceId || !href) return;
@@ -42,6 +44,31 @@ export function Browse() {
       cancelled = true;
     };
   }, [sourceId, href]);
+
+  async function loadMore() {
+    if (loadingMoreRef.current || loading || !feed?.next) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    try {
+      const r = await api.fetchFeed(sourceId, feed.next);
+      setFeed((prev) => {
+        if (!prev) return r.feed;
+        const seen = new Set(prev.entries.map((e) => e.id));
+        const fresh = r.feed.entries.filter((e) => !seen.has(e.id));
+        return {
+          ...r.feed,
+          navigation: prev.navigation,
+          entries: [...prev.entries, ...fresh],
+          next: fresh.length > 0 ? r.feed.next : undefined,
+        };
+      });
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  }
 
   function go(nextHref: string, nextTitle: string) {
     const p = new URLSearchParams({
@@ -127,12 +154,41 @@ export function Browse() {
         </section>
       )}
 
+      {!loading && feed?.next && (
+        <LazyLoadSentinel onVisible={loadMore} loading={loadingMore} />
+      )}
+
       {!loading &&
         feed &&
         feed.entries.length === 0 &&
         subsections.length === 0 && (
           <p className="text-sm text-ink-soft">Empty.</p>
         )}
+    </div>
+  );
+}
+
+function LazyLoadSentinel({ onVisible, loading }: { onVisible: () => void; loading: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const onVisibleRef = useRef(onVisible);
+  onVisibleRef.current = onVisible;
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || loading) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) onVisibleRef.current();
+      },
+      { rootMargin: "600px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loading]);
+
+  return (
+    <div ref={ref} className="mt-5 flex h-10 items-center justify-center text-sm text-ink-soft">
+      {loading ? "Loading more…" : null}
     </div>
   );
 }
