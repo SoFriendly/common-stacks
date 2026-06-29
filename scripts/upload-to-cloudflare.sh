@@ -93,33 +93,57 @@ NSIS_SIG=$(find artifacts/windows-nsis -name "*.exe.sig" 2>/dev/null | head -1)
 
 # --- latest.json merge ---
 read_sig() { [ -f "$1" ] && cat "$1" || true; }
+
 MAC_SIG=$(read_sig "${MAC_TAR}.sig")
 LINUX_X64_SIG=$(read_sig "$(find artifacts/linux-appimage-x86_64 -name "*.AppImage.sig" 2>/dev/null | head -1)")
 LINUX_ARM_SIG=$(read_sig "$(find artifacts/linux-appimage-aarch64 -name "*.AppImage.sig" 2>/dev/null | head -1)")
-WIN_SIG=$(read_sig "$(find artifacts/windows-msi -name "*.msi.sig" 2>/dev/null | head -1)")
+
+# Prefer the NSIS installer for Tauri updates on Windows. Keep MSI as a
+# fallback for older artifact sets.
+WIN_NSIS_SIG=$(read_sig "$(find artifacts/windows-nsis -name "*.exe.sig" 2>/dev/null | head -1)")
+WIN_MSI_SIG=$(read_sig "$(find artifacts/windows-msi -name "*.msi.sig" 2>/dev/null | head -1)")
 
 LATEST=src-tauri/target/release/bundle/latest.json
 mkdir -p "$(dirname "$LATEST")"
 s3 s3 cp "s3://${CLOUDFLARE_R2_BUCKET}/latest.json" "$LATEST" --no-progress 2>/dev/null \
   || echo '{"platforms":{}}' > "$LATEST"
 
-FILTER=""
+PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+jq --arg ver "$VERSION" --arg notes "$NOTES" --arg pub_date "$PUB_DATE" '
+  .platforms = (.platforms // {})
+  | .version = $ver
+  | .notes = $notes
+  | .pub_date = $pub_date
+' "$LATEST" > "${LATEST}.tmp" && mv "${LATEST}.tmp" "$LATEST"
+
+UPDATED=0
+add_platform() {
+  local platform=$1 sig=$2 url=$3
+  [ -n "$sig" ] || return 0
+  jq --arg platform "$platform" --arg sig "$sig" --arg url "$url" \
+    '.platforms[$platform] = {"signature": $sig, "url": $url}' \
+    "$LATEST" > "${LATEST}.tmp" && mv "${LATEST}.tmp" "$LATEST"
+  UPDATED=1
+}
+
 if [ -n "$MAC_SIG" ]; then
   # Universal binary — both arm64 and x86_64 installs pull the same tarball.
-  FILTER="$FILTER | .platforms[\"darwin-aarch64\"] = {\"signature\": \$mac, \"url\": \"$PUBLIC_BASE/v\(\$ver)/${APP}_\(\$ver)_darwin-universal.app.tar.gz\"}"
-  FILTER="$FILTER | .platforms[\"darwin-x86_64\"] = {\"signature\": \$mac, \"url\": \"$PUBLIC_BASE/v\(\$ver)/${APP}_\(\$ver)_darwin-universal.app.tar.gz\"}"
+  MAC_URL="${PUBLIC_BASE}/v${VERSION}/${APP}_${VERSION}_darwin-universal.app.tar.gz"
+  add_platform "darwin-aarch64" "$MAC_SIG" "$MAC_URL"
+  add_platform "darwin-x86_64" "$MAC_SIG" "$MAC_URL"
 fi
-[ -n "$LINUX_X64_SIG" ] && FILTER="$FILTER | .platforms[\"linux-x86_64\"] = {\"signature\": \$linx, \"url\": \"$PUBLIC_BASE/v\(\$ver)/${APP}_\(\$ver)_amd64.AppImage\"}"
-[ -n "$LINUX_ARM_SIG" ] && FILTER="$FILTER | .platforms[\"linux-aarch64\"] = {\"signature\": \$linarm, \"url\": \"$PUBLIC_BASE/v\(\$ver)/${APP}_\(\$ver)_arm64.AppImage\"}"
-[ -n "$WIN_SIG" ] && FILTER="$FILTER | .platforms[\"windows-x86_64\"] = {\"signature\": \$win, \"url\": \"$PUBLIC_BASE/v\(\$ver)/${APP}_\(\$ver)_x64-setup.msi\"}"
 
-if [ -n "$FILTER" ]; then
-  FILTER="${FILTER# | }"
-  PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-  FILTER=".version = \$ver | .notes = \$notes | .pub_date = \$pub_date | $FILTER"
-  jq --arg ver "$VERSION" --arg notes "$NOTES" --arg pub_date "$PUB_DATE" \
-     --arg mac "$MAC_SIG" --arg linx "$LINUX_X64_SIG" --arg linarm "$LINUX_ARM_SIG" --arg win "$WIN_SIG" \
-     "$FILTER" "$LATEST" > "${LATEST}.tmp" && mv "${LATEST}.tmp" "$LATEST"
+add_platform "linux-x86_64" "$LINUX_X64_SIG" "${PUBLIC_BASE}/v${VERSION}/${APP}_${VERSION}_amd64.AppImage"
+add_platform "linux-aarch64" "$LINUX_ARM_SIG" "${PUBLIC_BASE}/v${VERSION}/${APP}_${VERSION}_arm64.AppImage"
+
+if [ -n "$WIN_NSIS_SIG" ]; then
+  add_platform "windows-x86_64" "$WIN_NSIS_SIG" "${PUBLIC_BASE}/v${VERSION}/${APP}_${VERSION}_x64-setup.exe"
+elif [ -n "$WIN_MSI_SIG" ]; then
+  add_platform "windows-x86_64" "$WIN_MSI_SIG" "${PUBLIC_BASE}/v${VERSION}/${APP}_${VERSION}_x64-setup.msi"
+fi
+
+if [ "$UPDATED" = "1" ]; then
+  jq . "$LATEST" >/dev/null
   upload "$LATEST" "latest.json"
 else
   echo "No signatures found; not updating latest.json"

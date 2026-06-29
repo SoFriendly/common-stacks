@@ -13,7 +13,12 @@ import {
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { ChevronDown, Puzzle } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
-import { checkForUpdate, useUpdateStatus } from "../lib/updateStore";
+import {
+  checkForUpdate,
+  downloadAndInstall,
+  restartApp,
+  useUpdateStatus,
+} from "../lib/updateStore";
 import { useIsAndroid, useIsMobile } from "../lib/platform";
 
 export function Settings() {
@@ -289,12 +294,14 @@ export function Settings() {
         <SendTargetsPanel />
       </SettingsRow>
 
-      <SettingsRow
-        title="App updates"
-        description="Common Stacks auto-checks for updates on launch."
-      >
-        <UpdatePanel />
-      </SettingsRow>
+      {!isAndroid && (
+        <SettingsRow
+          title="App updates"
+          description="Common Stacks auto-checks for updates on launch."
+        >
+          <UpdatePanel />
+        </SettingsRow>
+      )}
 
       <SettingsRow
         title="Import / Export"
@@ -388,18 +395,36 @@ function UpdatePanel() {
   }
 
   return (
-    <div className="flex items-center justify-between rounded-md border border-shelf bg-white p-3">
-      <div>
+    <div className="flex items-center justify-between gap-3 rounded-md border border-shelf bg-white p-3">
+      <div className="min-w-0">
         <div className="text-sm">Common Stacks {version || "—"}</div>
         {statusText && <div className="mt-0.5 text-xs text-ink-soft">{statusText}</div>}
       </div>
-      <button
-        onClick={handleCheck}
-        disabled={checking || status.kind === "downloading" || status.kind === "installing"}
-        className="rounded-md border border-shelf bg-white px-3 py-2 text-sm hover:bg-shelf disabled:opacity-50"
-      >
-        Check for updates
-      </button>
+      <div className="flex shrink-0 items-center gap-2">
+        {status.kind === "available" && (
+          <button
+            onClick={() => void downloadAndInstall()}
+            className="rounded-md bg-ink px-3 py-2 text-sm text-paper hover:bg-ink/90"
+          >
+            Install
+          </button>
+        )}
+        {status.kind === "ready" && (
+          <button
+            onClick={() => void restartApp()}
+            className="rounded-md bg-ink px-3 py-2 text-sm text-paper hover:bg-ink/90"
+          >
+            Restart
+          </button>
+        )}
+        <button
+          onClick={handleCheck}
+          disabled={checking || status.kind === "downloading" || status.kind === "installing"}
+          className="rounded-md border border-shelf bg-white px-3 py-2 text-sm hover:bg-shelf disabled:opacity-50"
+        >
+          Check
+        </button>
+      </div>
     </div>
   );
 }

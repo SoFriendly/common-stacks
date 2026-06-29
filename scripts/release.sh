@@ -28,6 +28,6 @@ cat <<EOF
 
 === Release v$VERSION pushed ===
 macOS uploaded. GitHub Actions is building Linux/Windows.
-Once CI finishes, re-run ./scripts/upload-to-cloudflare.sh from the repo root
-with the artifacts/ folder populated, to merge those platforms into latest.json.
+Once CI finishes, the publish job uploads those artifacts and merges them into
+latest.json for the Tauri updater.
 EOF
