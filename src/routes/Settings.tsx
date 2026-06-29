@@ -130,7 +130,7 @@ export function Settings() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-6 pb-16">
+    <div className={isMobile ? "mx-auto max-w-5xl px-4 pt-4 pb-4" : "mx-auto max-w-5xl px-6 pb-16"}>
       {!isMobile && (
         <Link
           to="/library"
@@ -139,9 +139,11 @@ export function Settings() {
           ← Library
         </Link>
       )}
-      <header className="mb-10">
-        <h1 className="font-display text-3xl tracking-tight">Settings</h1>
-      </header>
+      {!isMobile && (
+        <header className="mb-10">
+          <h1 className="font-display text-3xl tracking-tight">Settings</h1>
+        </header>
+      )}
 
       <SettingsRow
         title="Libraries"
@@ -628,6 +630,7 @@ function Toggle({
 }
 
 function PluginsPanel() {
+  const isMobile = useIsMobile();
   const [plugins, setPlugins] = useState<InstalledPlugin[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -640,8 +643,8 @@ function PluginsPanel() {
 
   const [dir, setDir] = useState<string>("");
   useEffect(() => {
-    api.pluginsDir().then(setDir);
-  }, []);
+    if (!isMobile) api.pluginsDir().then(setDir);
+  }, [isMobile]);
 
   async function handleReveal() {
     try {
@@ -663,14 +666,20 @@ function PluginsPanel() {
         <div className="text-xs text-ink-soft">
           {loading ? "Loading…" : `${plugins.length} installed`}
         </div>
-        <button
-          onClick={handleReveal}
-          className="rounded-md border border-shelf bg-white px-3 py-1.5 text-sm hover:bg-shelf"
-        >
-          Open plugins folder
-        </button>
+        {!isMobile && (
+          <button
+            onClick={handleReveal}
+            className="rounded-md border border-shelf bg-white px-3 py-1.5 text-sm hover:bg-shelf"
+          >
+            Open plugins folder
+          </button>
+        )}
       </div>
-      {dir && (
+      {isMobile ? (
+        <div className="mb-3 text-[11px] text-ink-soft">
+          User plugin folders are managed on desktop in this release.
+        </div>
+      ) : dir && (
         <div className="mb-3 text-[11px] text-ink-soft">
           Drop a plugin folder (containing <code>manifest.json</code> and an
           executable script or binary) into{" "}

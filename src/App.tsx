@@ -8,6 +8,7 @@ import { Book } from "./routes/Book";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { UpdateChecker } from "./components/UpdateChecker";
 import { MobileHeader } from "./components/MobileHeader";
+import { MobileTabBar } from "./components/MobileTabBar";
 import { MobileSearchProvider } from "./lib/mobileSearch";
 import { PullToRefreshHost } from "./lib/pullToRefresh";
 import { useIsMobile } from "./lib/platform";
@@ -29,7 +30,7 @@ export default function App() {
           ref={mainRef}
           className={
             isMobile
-              ? "flex-1 overflow-y-auto overscroll-y-contain"
+              ? "flex-1 overflow-y-auto overscroll-y-contain pb-[calc(5.25rem+env(safe-area-inset-bottom))]"
               : "flex-1 overflow-y-auto overscroll-y-contain pt-10"
           }
         >
@@ -47,6 +48,7 @@ export default function App() {
             </ErrorBoundary>
           </PullToRefreshHost>
         </main>
+        {isMobile && <MobileTabBar />}
         {!isMobile && <UpdateChecker />}
       </div>
     </MobileSearchProvider>

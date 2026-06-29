@@ -17,6 +17,8 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use reqwest::multipart::{Form, Part};
 use serde::Deserialize;
+use std::net::{Ipv4Addr, SocketAddrV4, UdpSocket};
+use std::time::Duration;
 
 pub struct CrosspointTarget;
 
@@ -34,7 +36,8 @@ impl SendTarget for CrosspointTarget {
         PluginDescriptor {
             id: "crosspoint".into(),
             name: "Crosspoint Reader".into(),
-            description: "Upload books over Wi-Fi to a Crosspoint Reader on your local network.".into(),
+            description: "Upload books over Wi-Fi to a Crosspoint Reader on your local network."
+                .into(),
         }
     }
 
@@ -128,12 +131,34 @@ impl SendTarget for CrosspointTarget {
             }
         };
 
-        let base = format!("http://{}:{}", host, port);
-        ctx.emit(SendProgress::stage("connecting", format!("Looking for {}…", host)));
+        ctx.emit(SendProgress::stage(
+            "connecting",
+            format!("Looking for {}…", host),
+        ));
+
+        let connect_host = if host.to_ascii_lowercase().ends_with(".local") {
+            ctx.emit(SendProgress::stage(
+                "resolving",
+                format!("Resolving {} with mDNS…", host),
+            ));
+            match resolve_mdns_ipv4(&host).await {
+                Some(ip) => {
+                    ctx.emit(SendProgress::stage(
+                        "resolved",
+                        format!("Found {} at {}…", host, ip),
+                    ));
+                    ip.to_string()
+                }
+                None => host.clone(),
+            }
+        } else {
+            host.clone()
+        };
+        let base = format!("http://{}:{}", connect_host, port);
 
         let client = crate::tls::client_builder()
-            .timeout(std::time::Duration::from_secs(600))
-            .connect_timeout(std::time::Duration::from_secs(8))
+            .timeout(Duration::from_secs(600))
+            .connect_timeout(Duration::from_secs(8))
             .user_agent("Common Stacks/0.1")
             .build()?;
 
@@ -160,10 +185,17 @@ impl SendTarget for CrosspointTarget {
                 ));
             }
             Err(e) => {
+                let hint = if host.to_ascii_lowercase().ends_with(".local") && connect_host == host
+                {
+                    " Android could not resolve the .local name; set the Crosspoint Reader host to its IP address in Settings."
+                } else {
+                    ""
+                };
                 return Err(anyhow!(
-                    "Could not reach {} ({}). Is the Crosspoint on the network and is mDNS working?",
+                    "Could not reach {} ({}). Is the Crosspoint on the network and is mDNS working?{}",
                     base,
-                    e
+                    e,
+                    hint
                 ));
             }
         }
@@ -247,11 +279,7 @@ impl SendTarget for CrosspointTarget {
             .mime_str(mime)?;
         let form = Form::new().part("file", part);
 
-        let upload_url = format!(
-            "{}/upload?path={}",
-            base,
-            urlencode_path_component(&folder)
-        );
+        let upload_url = format!("{}/upload?path={}", base, urlencode_path_component(&folder));
 
         ctx.emit(SendProgress::stage(
             "uploading",
@@ -287,6 +315,145 @@ fn fmt_size(n: usize) -> String {
     } else {
         format!("{:.2} GB", n / 1024.0 / 1024.0 / 1024.0)
     }
+}
+
+async fn resolve_mdns_ipv4(host: &str) -> Option<Ipv4Addr> {
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    tokio::task::spawn_blocking(move || resolve_mdns_ipv4_blocking(&host))
+        .await
+        .ok()
+        .flatten()
+}
+
+fn resolve_mdns_ipv4_blocking(host: &str) -> Option<Ipv4Addr> {
+    let query = build_mdns_query(host)?;
+    let socket = UdpSocket::bind(("0.0.0.0", 0)).ok()?;
+    let _ = socket.set_read_timeout(Some(Duration::from_millis(550)));
+    let _ = socket.set_multicast_ttl_v4(255);
+    let mdns = SocketAddrV4::new(Ipv4Addr::new(224, 0, 0, 251), 5353);
+    let mut buf = [0u8; 1500];
+
+    for _ in 0..3 {
+        let _ = socket.send_to(&query, mdns);
+        if let Ok((n, _)) = socket.recv_from(&mut buf) {
+            if let Some(ip) = parse_mdns_a_response(host, &buf[..n]) {
+                return Some(ip);
+            }
+        }
+    }
+    None
+}
+
+fn build_mdns_query(host: &str) -> Option<Vec<u8>> {
+    let mut out = Vec::with_capacity(64);
+    out.extend_from_slice(&[
+        0, 0, // transaction id
+        0, 0, // flags
+        0, 1, // questions
+        0, 0, // answers
+        0, 0, // authority
+        0, 0, // additional
+    ]);
+    for label in host.split('.') {
+        let bytes = label.as_bytes();
+        if bytes.is_empty() || bytes.len() > 63 {
+            return None;
+        }
+        out.push(bytes.len() as u8);
+        out.extend_from_slice(bytes);
+    }
+    out.push(0);
+    out.extend_from_slice(&[
+        0, 1, // A
+        0x80, 1, // IN with QU bit, asking responders to reply unicast
+    ]);
+    Some(out)
+}
+
+fn parse_mdns_a_response(host: &str, packet: &[u8]) -> Option<Ipv4Addr> {
+    if packet.len() < 12 {
+        return None;
+    }
+    let qd = u16::from_be_bytes([packet[4], packet[5]]) as usize;
+    let an = u16::from_be_bytes([packet[6], packet[7]]) as usize;
+    let ns = u16::from_be_bytes([packet[8], packet[9]]) as usize;
+    let ar = u16::from_be_bytes([packet[10], packet[11]]) as usize;
+
+    let mut offset = 12;
+    for _ in 0..qd {
+        parse_dns_name(packet, &mut offset)?;
+        offset = offset.checked_add(4)?;
+        if offset > packet.len() {
+            return None;
+        }
+    }
+
+    for _ in 0..(an + ns + ar) {
+        let name = parse_dns_name(packet, &mut offset)?;
+        if offset.checked_add(10)? > packet.len() {
+            return None;
+        }
+        let rr_type = u16::from_be_bytes([packet[offset], packet[offset + 1]]);
+        let class = u16::from_be_bytes([packet[offset + 2], packet[offset + 3]]) & 0x7fff;
+        let rd_len = u16::from_be_bytes([packet[offset + 8], packet[offset + 9]]) as usize;
+        offset += 10;
+        if offset.checked_add(rd_len)? > packet.len() {
+            return None;
+        }
+        if rr_type == 1 && class == 1 && rd_len == 4 && same_dns_name(&name, host) {
+            return Some(Ipv4Addr::new(
+                packet[offset],
+                packet[offset + 1],
+                packet[offset + 2],
+                packet[offset + 3],
+            ));
+        }
+        offset += rd_len;
+    }
+    None
+}
+
+fn parse_dns_name(packet: &[u8], offset: &mut usize) -> Option<String> {
+    let mut labels = Vec::new();
+    let mut pos = *offset;
+    let mut jumped = false;
+    let mut jumps = 0;
+
+    loop {
+        let len = *packet.get(pos)?;
+        if len & 0xc0 == 0xc0 {
+            let next = *packet.get(pos + 1)? as usize;
+            let ptr = (((len & 0x3f) as usize) << 8) | next;
+            if !jumped {
+                *offset = pos + 2;
+            }
+            pos = ptr;
+            jumped = true;
+            jumps += 1;
+            if jumps > 8 {
+                return None;
+            }
+            continue;
+        }
+        if len == 0 {
+            if !jumped {
+                *offset = pos + 1;
+            }
+            break;
+        }
+        pos += 1;
+        let end = pos.checked_add(len as usize)?;
+        let label = std::str::from_utf8(packet.get(pos..end)?).ok()?;
+        labels.push(label.to_ascii_lowercase());
+        pos = end;
+    }
+
+    Some(labels.join("."))
+}
+
+fn same_dns_name(a: &str, b: &str) -> bool {
+    a.trim_end_matches('.')
+        .eq_ignore_ascii_case(b.trim_end_matches('.'))
 }
 
 fn mime_for(filename: &str) -> &'static str {

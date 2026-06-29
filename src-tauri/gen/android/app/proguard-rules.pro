@@ -25,3 +25,10 @@
 # notice. Without this, every HTTPS request from Rust fails with
 # ClassNotFoundException: org/rustls/platformverifier/CertificateVerifier
 -keep class org.rustls.platformverifier.** { *; }
+
+# Called from Rust through JNI by exact name/signature when opening downloaded
+# files. R8 does not see a static Kotlin/Java call site, so release minification
+# may otherwise rename or strip this method and crash with NoSuchMethodError.
+-keepclassmembers class com.sofriendly.commonstacks.MainActivity {
+    public java.lang.String openDownloadedFile(java.lang.String, java.lang.String);
+}

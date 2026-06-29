@@ -76,11 +76,8 @@ pub async fn update_source(state: State<'_, AppState>, source: Source) -> CmdRes
 pub async fn reorder_sources(state: State<'_, AppState>, ids: Vec<String>) -> CmdResult<()> {
     {
         let mut cfg = state.config.write().await;
-        cfg.sources.sort_by_key(|s| {
-            ids.iter()
-                .position(|id| id == &s.id)
-                .unwrap_or(usize::MAX)
-        });
+        cfg.sources
+            .sort_by_key(|s| ids.iter().position(|id| id == &s.id).unwrap_or(usize::MAX));
     }
     state.save().await.map_err(err)
 }
@@ -141,7 +138,12 @@ pub async fn fetch_feed(
     let feed = match state.client.fetch_feed(&source, &target).await {
         Ok(f) => f,
         Err(e) => {
-            tracing::warn!("fetch_feed failed (source={}, url={}): {:?}", source.id, target, e);
+            tracing::warn!(
+                "fetch_feed failed (source={}, url={}): {:?}",
+                source.id,
+                target,
+                e
+            );
             return Err(err(e));
         }
     };
@@ -240,7 +242,11 @@ pub async fn download_book(
                 .and_then(downloads::ext_from_mime)
                 .map(|s| s.to_string())
         })
-        .or_else(|| ct.as_deref().and_then(downloads::ext_from_mime).map(|s| s.to_string()))
+        .or_else(|| {
+            ct.as_deref()
+                .and_then(downloads::ext_from_mime)
+                .map(|s| s.to_string())
+        })
         .unwrap_or_else(|| "bin".to_string());
 
     let filename = downloads::build_filename(&request.title, request.author.as_deref(), &ext);
@@ -285,11 +291,17 @@ pub fn inspect_download(path: String) -> CmdResult<crate::epub::EpubMetadata> {
 }
 
 #[tauri::command]
-pub fn open_download(path: String) -> CmdResult<()> {
-    let p = std::path::PathBuf::from(&path);
+pub fn open_download(app: tauri::AppHandle, path: String) -> CmdResult<()> {
+    let p = PathBuf::from(&path);
     if !p.exists() {
         return Err(format!("file not found: {}", path));
     }
+    #[cfg(target_os = "android")]
+    {
+        return open_download_android(&app, &path, mime_for_path(&p));
+    }
+    #[cfg(not(target_os = "android"))]
+    let _ = &app;
     #[cfg(target_os = "macos")]
     {
         std::process::Command::new("open")
@@ -314,11 +326,85 @@ pub fn open_download(path: String) -> CmdResult<()> {
             .map_err(err)?;
         return Ok(());
     }
-    #[cfg(any(target_os = "ios", target_os = "android"))]
+    #[cfg(target_os = "ios")]
     {
         let _ = path;
         Err("Opening files in an external app is not yet supported on mobile.".into())
     }
+}
+
+#[cfg(target_os = "android")]
+fn mime_for_path(path: &std::path::Path) -> &'static str {
+    match path
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("epub") => "application/epub+zip",
+        Some("pdf") => "application/pdf",
+        Some("mobi") => "application/x-mobipocket-ebook",
+        Some("azw3") => "application/vnd.amazon.ebook",
+        Some("cbz") => "application/vnd.comicbook+zip",
+        Some("cbr") => "application/vnd.comicbook-rar",
+        Some("txt") => "text/plain",
+        Some("mp3") => "audio/mpeg",
+        Some("m4a") | Some("m4b") => "audio/mp4",
+        Some("ogg") => "audio/ogg",
+        Some("opus") => "audio/opus",
+        Some("flac") => "audio/flac",
+        Some("wav") => "audio/wav",
+        _ => "application/octet-stream",
+    }
+}
+
+#[cfg(target_os = "android")]
+fn open_download_android(app: &tauri::AppHandle, path: &str, mime: &str) -> CmdResult<()> {
+    use jni::objects::{JObject, JString, JValue};
+    use std::sync::mpsc;
+    use std::time::Duration;
+    use tauri::Manager;
+
+    let webview = app
+        .get_webview_window("main")
+        .ok_or_else(|| "main webview window is not available".to_string())?;
+    let path = path.to_string();
+    let mime = mime.to_string();
+    let (tx, rx) = mpsc::channel::<CmdResult<()>>();
+
+    webview
+        .with_webview(move |platform| {
+            platform.jni_handle().exec(move |env, activity, _webview| {
+                let result = (|| -> CmdResult<()> {
+                    let activity_ref = unsafe { JObject::from_raw(activity.as_raw()) };
+                    let j_path = env.new_string(&path).map_err(err)?;
+                    let j_mime = env.new_string(&mime).map_err(err)?;
+                    let message = env
+                        .call_method(
+                            &activity_ref,
+                            "openDownloadedFile",
+                            "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+                            &[JValue::Object(&j_path), JValue::Object(&j_mime)],
+                        )
+                        .map_err(err)?
+                        .l()
+                        .map_err(err)?;
+
+                    if message.is_null() {
+                        Ok(())
+                    } else {
+                        let message = JString::from(message);
+                        let message: String = env.get_string(&message).map_err(err)?.into();
+                        Err(message)
+                    }
+                })();
+                let _ = tx.send(result);
+            });
+        })
+        .map_err(err)?;
+
+    rx.recv_timeout(Duration::from_secs(5))
+        .map_err(|_| "Timed out while opening file on Android.".to_string())?
 }
 
 #[tauri::command]
@@ -388,10 +474,7 @@ pub async fn export_config(state: State<'_, AppState>) -> CmdResult<String> {
 }
 
 #[tauri::command]
-pub async fn export_config_to_path(
-    state: State<'_, AppState>,
-    path: String,
-) -> CmdResult<()> {
+pub async fn export_config_to_path(state: State<'_, AppState>, path: String) -> CmdResult<()> {
     let cfg: Config = state.config.read().await.clone();
     let json = serde_json::to_string_pretty(&cfg).map_err(err)?;
     std::fs::write(&path, json).map_err(err)
@@ -423,10 +506,7 @@ pub fn write_enrichment_cache(contents: String) -> CmdResult<()> {
 }
 
 #[tauri::command]
-pub async fn import_config_from_path(
-    state: State<'_, AppState>,
-    path: String,
-) -> CmdResult<()> {
+pub async fn import_config_from_path(state: State<'_, AppState>, path: String) -> CmdResult<()> {
     let json = std::fs::read_to_string(&path).map_err(err)?;
     let incoming: Config = serde_json::from_str(&json).map_err(err)?;
     {
@@ -526,7 +606,12 @@ pub fn reveal_plugins_dir() -> CmdResult<()> {
                 .map_err(err)?;
             return Ok(());
         }
-        #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux", target_os = "freebsd")))]
+        #[cfg(not(any(
+            target_os = "macos",
+            target_os = "windows",
+            target_os = "linux",
+            target_os = "freebsd"
+        )))]
         {
             let _ = path;
             Err("Unsupported platform".into())
@@ -592,7 +677,11 @@ pub async fn get_send_target_settings(
     target_id: String,
 ) -> CmdResult<std::collections::HashMap<String, String>> {
     let cfg = state.config.read().await;
-    Ok(cfg.send_targets.get(&target_id).cloned().unwrap_or_default())
+    Ok(cfg
+        .send_targets
+        .get(&target_id)
+        .cloned()
+        .unwrap_or_default())
 }
 
 #[tauri::command]
@@ -707,7 +796,13 @@ fn slugify(s: &str) -> String {
     }
     let trimmed = out.trim_matches('-').to_string();
     if trimmed.is_empty() {
-        format!("src-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0))
+        format!(
+            "src-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or(0)
+        )
     } else {
         trimmed
     }

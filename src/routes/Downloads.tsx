@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   api,
   type DownloadedFile,
@@ -17,6 +18,7 @@ import {
   type SendModalState,
 } from "../components/SendProgressModal";
 import { EmptyState } from "../components/EmptyState";
+import { tap } from "../lib/haptics";
 
 type View = "grid" | "list";
 
@@ -34,6 +36,7 @@ export function Downloads() {
   const [formatFilter] = useFormatFilter();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const effectiveView = isMobile ? "grid" : view;
 
   const filteredItems = items.filter((it) => {
     if (formatFilter === "all") return true;
@@ -172,42 +175,50 @@ export function Downloads() {
   }
 
   return (
-    <div className="px-6 pb-16">
+    <div className={isMobile ? "px-4 pt-4 pb-4" : "px-6 pb-16"}>
       <SendProgressModal state={sendModal} onClose={() => setSendModal(null)} />
-      <header className="mb-6 flex items-center justify-between gap-6">
-        <div className="flex items-center gap-1">
-          {!isMobile && <ViewToggle />}
-          <FormatFilter />
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="mr-2 flex overflow-hidden rounded-md bg-shelf/60 p-0.5 text-sm">
-            <button
-              onClick={() => setView("grid")}
-              className={`rounded px-3 py-1 ${
-                view === "grid" ? "bg-paper text-ink shadow-sm" : "text-ink-soft"
-              }`}
-            >
-              Grid
-            </button>
-            <button
-              onClick={() => setView("list")}
-              className={`rounded px-3 py-1 ${
-                view === "list" ? "bg-paper text-ink shadow-sm" : "text-ink-soft"
-              }`}
-            >
-              List
-            </button>
+      {!isMobile && (
+        <header className="mb-6 flex items-center justify-between gap-6">
+          <div className="flex items-center gap-1">
+            <ViewToggle />
+            <FormatFilter />
           </div>
-          <NavLink
-            to="/settings"
-            aria-label="Settings"
-            title="Settings"
-            className="flex h-9 w-9 items-center justify-center rounded-md text-ink-soft transition-colors hover:bg-shelf hover:text-ink"
-          >
-            <SettingsIcon className="h-4 w-4" />
-          </NavLink>
+          <div className="flex items-center gap-2">
+            <div className="mr-2 flex overflow-hidden rounded-md bg-shelf/60 p-0.5 text-sm">
+              <button
+                onClick={() => setView("grid")}
+                className={`rounded px-3 py-1 ${
+                  view === "grid" ? "bg-paper text-ink shadow-sm" : "text-ink-soft"
+                }`}
+              >
+                Grid
+              </button>
+              <button
+                onClick={() => setView("list")}
+                className={`rounded px-3 py-1 ${
+                  view === "list" ? "bg-paper text-ink shadow-sm" : "text-ink-soft"
+                }`}
+              >
+                List
+              </button>
+            </div>
+            <NavLink
+              to="/settings"
+              aria-label="Settings"
+              title="Settings"
+              className="flex h-9 w-9 items-center justify-center rounded-md text-ink-soft transition-colors hover:bg-shelf hover:text-ink"
+            >
+              <SettingsIcon className="h-4 w-4" />
+            </NavLink>
+          </div>
+        </header>
+      )}
+
+      {isMobile && filteredItems.length > 0 && (
+        <div className="mb-4 px-1 text-sm text-ink-soft">
+          {filteredItems.length} {filteredItems.length === 1 ? "download" : "downloads"}
         </div>
-      </header>
+      )}
 
       {filteredItems.length === 0 ? (
         items.length === 0 ? (
@@ -227,8 +238,14 @@ export function Downloads() {
             downloads.
           </p>
         )
-      ) : view === "grid" ? (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-x-5 gap-y-10">
+      ) : effectiveView === "grid" ? (
+        <div
+          className={
+            isMobile
+              ? "grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-x-4 gap-y-7"
+              : "grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-x-5 gap-y-10"
+          }
+        >
           {filteredItems.map((it) => (
             <DownloadGridCard
               key={it.file.path}
@@ -279,9 +296,12 @@ function DownloadGridCard({
   const isAudiobook = badge === "Audiobook";
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
+  const longPressTimer = useRef<number | null>(null);
+  const longPressed = useRef(false);
 
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!menuOpen || isMobile) return;
     function onClick(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
@@ -289,13 +309,31 @@ function DownloadGridCard({
     }
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
-  }, [menuOpen]);
+  }, [isMobile, menuOpen]);
 
   function withClose(fn: () => void) {
     return () => {
       setMenuOpen(false);
       fn();
     };
+  }
+
+  function startLongPress() {
+    if (!isMobile) return;
+    longPressed.current = false;
+    if (longPressTimer.current !== null) window.clearTimeout(longPressTimer.current);
+    longPressTimer.current = window.setTimeout(() => {
+      longPressed.current = true;
+      tap(18);
+      setMenuOpen(true);
+    }, 450);
+  }
+
+  function clearLongPress() {
+    if (longPressTimer.current !== null) {
+      window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
   }
 
   return (
@@ -308,8 +346,18 @@ function DownloadGridCard({
         }}
       >
         <button
-          onClick={onOpen}
-          className={`relative w-full overflow-hidden rounded-md bg-shelf shadow-sm ring-1 ring-black/5 transition-shadow hover:shadow-lg ${
+          onPointerDown={startLongPress}
+          onPointerUp={clearLongPress}
+          onPointerCancel={clearLongPress}
+          onPointerLeave={clearLongPress}
+          onClick={() => {
+            if (longPressed.current) {
+              longPressed.current = false;
+              return;
+            }
+            onOpen();
+          }}
+          className={`relative w-full overflow-hidden rounded-lg bg-shelf shadow-sm ring-1 ring-black/5 transition duration-150 hover:shadow-lg active:scale-[0.99] ${
             isAudiobook ? "aspect-square" : "aspect-[2/3]"
           }`}
         >
@@ -345,19 +393,34 @@ function DownloadGridCard({
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
+              tap(8);
               setMenuOpen((v) => !v);
             }}
             onMouseDown={(e) => e.stopPropagation()}
             aria-label="More actions"
-            className={`flex h-7 w-7 items-center justify-center rounded-md bg-paper/90 text-ink shadow-sm ring-1 ring-black/10 backdrop-blur transition-opacity ${
-              menuOpen
+            className={`flex items-center justify-center bg-paper/90 text-ink shadow-sm ring-1 ring-black/10 backdrop-blur transition-opacity ${
+              isMobile
+                ? "h-9 w-9 rounded-full opacity-100"
+                : menuOpen
                 ? "opacity-100"
                 : "opacity-0 group-hover/card:opacity-100 focus:opacity-100"
             }`}
           >
             <MoreHorizontal className="h-4 w-4" />
           </button>
-          {menuOpen && (
+          {menuOpen && isMobile && (
+            <MobileActionSheet
+              title={displayTitle}
+              isAudiobook={isAudiobook}
+              sendTargets={sendTargets}
+              onClose={() => setMenuOpen(false)}
+              onOpen={withClose(onOpen)}
+              onRename={withClose(onRename)}
+              onDelete={withClose(onDelete)}
+              onSend={(target) => withClose(() => onSend(target))()}
+            />
+          )}
+          {menuOpen && !isMobile && (
             <div
               role="menu"
               className="absolute right-0 z-30 mt-1 w-40 overflow-hidden rounded-md border border-shelf bg-paper shadow-lg ring-1 ring-black/10"
@@ -408,6 +471,77 @@ function DownloadGridCard({
   );
 }
 
+function MobileActionSheet({
+  title,
+  isAudiobook,
+  sendTargets,
+  onClose,
+  onOpen,
+  onRename,
+  onDelete,
+  onSend,
+}: {
+  title: string;
+  isAudiobook: boolean;
+  sendTargets: SendTargetInfo[];
+  onClose: () => void;
+  onOpen: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+  onSend: (target: SendTargetInfo) => void;
+}) {
+  const availableTargets = sendTargets.filter((t) => {
+    if (!t.enabled) return false;
+    const needsSetup = t.schema.some((f) => f.required) && !t.configured;
+    return !needsSetup;
+  });
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/25"
+      role="presentation"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Download actions"
+        className="max-h-[calc(100dvh-5rem)] w-[min(100vw,36rem)] overflow-y-auto rounded-t-3xl bg-paper px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-2xl ring-1 ring-black/5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-spine/70" />
+        <div className="mb-3 line-clamp-2 px-1 font-display text-lg leading-tight text-ink min-[560px]:text-xl">
+          {title}
+        </div>
+        <div className="overflow-hidden rounded-2xl border border-shelf bg-white/55">
+          <MenuItem onClick={onOpen}>Open</MenuItem>
+          {!isAudiobook &&
+            availableTargets.map((target) => (
+              <MenuItem
+                key={target.descriptor.id}
+                onClick={() => onSend(target)}
+              >
+                Send to {target.descriptor.name.replace(/^Send to /, "")}
+              </MenuItem>
+            ))}
+          <MenuItem onClick={onRename}>Rename...</MenuItem>
+          <MenuItem onClick={onDelete} danger>
+            Delete
+          </MenuItem>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-3 flex min-h-12 w-full items-center justify-center rounded-2xl bg-shelf text-base font-medium text-ink active:bg-spine/40"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 function MenuItem({
   onClick,
   danger,
@@ -426,7 +560,7 @@ function MenuItem({
         e.stopPropagation();
         onClick();
       }}
-      className={`block w-full px-3 py-2 text-left text-sm transition-colors hover:bg-shelf ${
+      className={`block min-h-11 w-full px-3 py-2 text-left text-sm transition-colors hover:bg-shelf active:bg-shelf ${
         danger ? "text-red-700" : "text-ink"
       }`}
     >

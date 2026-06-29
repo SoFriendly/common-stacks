@@ -2,6 +2,8 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { CheckCircle2, AlertTriangle, Loader2, X } from "lucide-react";
 import type { SendProgress, SendTargetInfo } from "../lib/api";
+import { cn } from "../lib/utils";
+import { useIsMobile } from "../lib/platform";
 
 export type SendModalState =
   | {
@@ -19,6 +21,8 @@ interface Props {
 }
 
 export function SendProgressModal({ state, onClose }: Props) {
+  const isMobile = useIsMobile();
+
   useEffect(() => {
     if (!state) return;
     function onKey(e: KeyboardEvent) {
@@ -39,14 +43,22 @@ export function SendProgressModal({ state, onClose }: Props) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      className={cn(
+        "fixed inset-0 z-50 flex justify-center bg-black/40 backdrop-blur-sm",
+        isMobile ? "items-end" : "items-center",
+      )}
       onClick={() => {
         if (!isSending) onClose();
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-[min(32rem,calc(100vw-2rem))] rounded-xl bg-paper p-6 shadow-2xl ring-1 ring-black/10"
+        className={cn(
+          "relative max-h-[calc(100dvh-5rem)] overflow-y-auto bg-paper shadow-2xl ring-1 ring-black/10",
+          isMobile
+            ? "w-[min(100vw,36rem)] rounded-t-3xl px-5 pt-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
+            : "w-[min(32rem,calc(100vw-2rem))] rounded-xl p-6",
+        )}
         role="dialog"
         aria-modal="true"
       >
@@ -54,7 +66,10 @@ export function SendProgressModal({ state, onClose }: Props) {
           <button
             onClick={onClose}
             aria-label="Close"
-            className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-md text-ink-soft hover:bg-shelf hover:text-ink"
+            className={cn(
+              "absolute right-3 top-3 flex items-center justify-center text-ink-soft hover:bg-shelf hover:text-ink",
+              isMobile ? "h-11 w-11 rounded-full" : "h-7 w-7 rounded-md",
+            )}
           >
             <X className="h-4 w-4" />
           </button>
@@ -137,7 +152,12 @@ export function SendProgressModal({ state, onClose }: Props) {
           <div className="mt-6 flex justify-end">
             <button
               onClick={onClose}
-              className="rounded-md bg-ink px-4 py-1.5 text-sm text-paper"
+              className={cn(
+                "bg-ink px-4 font-medium text-paper",
+                isMobile
+                  ? "min-h-12 w-full rounded-xl text-base"
+                  : "w-auto rounded-md py-1.5 text-sm",
+              )}
             >
               Close
             </button>

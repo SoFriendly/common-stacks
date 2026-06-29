@@ -305,7 +305,7 @@ export function Library() {
   const showingSearch = searchResult !== null || searching;
 
   return (
-    <div className={isMobile ? "px-3 pb-16" : "px-6 pb-16"}>
+    <div className={isMobile ? "px-4 pt-4 pb-4" : "px-6 pb-16"}>
       {isMobile ? null : (
         <header className="mb-8 flex items-center justify-between gap-6">
           <div className="flex items-center gap-1">

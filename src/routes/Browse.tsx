@@ -93,7 +93,7 @@ export function Browse() {
     }) ?? [];
 
   return (
-    <div className="px-6 pb-16">
+    <div className={isMobile ? "px-4 pt-4 pb-4" : "px-6 pb-16"}>
       {!isMobile && (
         <button
           onClick={() => navigate(-1)}

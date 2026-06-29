@@ -265,7 +265,7 @@ export function Book() {
   }
 
   return (
-    <div className={isMobile ? "mx-auto max-w-5xl px-4 pb-20" : "mx-auto max-w-5xl px-10 pb-20"}>
+    <div className={isMobile ? "mx-auto max-w-5xl px-4 pt-5 pb-6" : "mx-auto max-w-5xl px-10 pb-20"}>
       {!isMobile && (
         <button
           onClick={() => navigate(-1)}
@@ -275,10 +275,12 @@ export function Book() {
         </button>
       )}
 
-      <div className="flex flex-row gap-4 md:gap-10">
-        <div className="shrink-0">
+      <div className={isMobile ? "flex flex-col gap-5" : "flex flex-row gap-4 md:gap-10"}>
+        <div className={isMobile ? "flex justify-center" : "shrink-0"}>
           <div
-            className={`relative w-32 overflow-hidden rounded-md bg-shelf shadow-lg ring-1 ring-black/5 sm:w-40 md:w-56 ${
+            className={`relative overflow-hidden rounded-lg bg-shelf shadow-lg ring-1 ring-black/5 ${
+              isMobile ? "w-44" : "w-32 sm:w-40 md:w-56"
+            } ${
               entryFormats(entry).includes("audiobook")
                 ? "aspect-square"
                 : "aspect-[2/3]"
@@ -315,17 +317,29 @@ export function Book() {
         </div>
 
         <div className="min-w-0 flex-1">
-          <h1 className="font-display text-3xl leading-tight tracking-tight text-ink">
+          <h1
+            className={`font-display text-3xl leading-tight tracking-tight text-ink ${
+              isMobile ? "text-center" : ""
+            }`}
+          >
             {entry.title}
           </h1>
           {entry.authors.length > 0 && (
-            <div className="mt-2 font-display text-lg text-ink-soft">
+            <div
+              className={`mt-2 font-display text-lg text-ink-soft ${
+                isMobile ? "text-center" : ""
+              }`}
+            >
               {entry.authors.join(", ")}
             </div>
           )}
 
           {entryFormats(entry).length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
+            <div
+              className={`mt-3 flex flex-wrap gap-1.5 ${
+                isMobile ? "justify-center" : ""
+              }`}
+            >
               {entryFormats(entry).map((f) => {
                 const isAudio = f === "audiobook";
                 return (
@@ -344,7 +358,11 @@ export function Book() {
             </div>
           )}
 
-          <div className="mt-3 text-xs text-ink-soft">
+          <div
+            className={`mt-3 text-xs text-ink-soft ${
+              isMobile ? "text-center" : ""
+            }`}
+          >
             {state.sourceName ?? state.sourceId}
             {state.alternateSources && state.alternateSources.length > 1 && (
               <> · available from {state.alternateSources.length} libraries</>
@@ -352,7 +370,11 @@ export function Book() {
           </div>
 
           {entry.categories.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div
+              className={`mt-4 flex flex-wrap gap-2 ${
+                isMobile ? "justify-center" : ""
+              }`}
+            >
               {dedupCategories(entry.categories).slice(0, 12).map((c, i) => (
                 <span
                   key={i}
@@ -364,7 +386,7 @@ export function Book() {
             </div>
           )}
 
-          <div className="mt-8">
+          <div className={isMobile ? "mt-7" : "mt-8"}>
             <h2 className="mb-3 font-display text-lg">Download</h2>
             {resolving && (
               <p className="text-sm text-ink-soft">Resolving downloads…</p>
@@ -375,7 +397,7 @@ export function Book() {
             {!resolving && acquisitions.length === 0 && !resolveError && (
               <p className="text-sm text-ink-soft">No downloadable formats.</p>
             )}
-            <div className="flex flex-wrap gap-2">
+            <div className={isMobile ? "flex flex-col gap-2" : "flex flex-wrap gap-2"}>
               {acquisitions.map((a) => {
                 const downloading =
                   downloadState.kind === "downloading" &&
@@ -385,11 +407,18 @@ export function Book() {
                 const failed =
                   downloadState.kind === "error" && downloadState.href === a.href;
                 return (
-                  <div key={a.href} className="flex items-center gap-2">
+                  <div
+                    key={a.href}
+                    className={isMobile ? "flex flex-col gap-1" : "flex items-center gap-2"}
+                  >
                     {done ? (
                       <button
                         onClick={viewInDownloads}
-                        className="rounded-md bg-ink px-4 py-2 text-sm text-paper"
+                        className={
+                          isMobile
+                            ? "min-h-12 rounded-xl bg-ink px-4 text-base font-medium text-paper active:opacity-90"
+                            : "rounded-md bg-ink px-4 py-2 text-sm text-paper"
+                        }
                       >
                         View in Downloads
                       </button>
@@ -397,13 +426,17 @@ export function Book() {
                       <button
                         onClick={() => handleDownload(a)}
                         disabled={downloading}
-                        className="rounded-md bg-ink px-4 py-2 text-sm text-paper transition-opacity disabled:opacity-50"
+                        className={
+                          isMobile
+                            ? "min-h-12 rounded-xl bg-ink px-4 text-base font-medium text-paper transition-opacity active:opacity-90 disabled:opacity-50"
+                            : "rounded-md bg-ink px-4 py-2 text-sm text-paper transition-opacity disabled:opacity-50"
+                        }
                       >
                         {downloading ? "Downloading…" : `Download ${formatLabel(a)}`}
                       </button>
                     )}
                     {failed && (
-                      <span className="text-xs text-red-700">
+                      <span className={isMobile ? "text-sm text-red-700" : "text-xs text-red-700"}>
                         {(downloadState as { kind: "error"; message: string }).message}
                       </span>
                     )}

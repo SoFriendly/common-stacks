@@ -20,7 +20,16 @@
     color: var(--color-ink);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
     text-rendering: optimizeLegibility;
+  }
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
   }
   /* Hide scrollbars globally; scrolling still works. */
   * {
@@ -45,4 +54,3 @@
     display: none;
   }
 }
-
