@@ -90,88 +90,9 @@ jobs:
           name: linux-deb-${{ matrix.arch }}
           path: staging/deb/*
 
-  windows:
-    name: Windows (x86_64)
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-pc-windows-msvc
-      - uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-      - run: bun install
-      - run: bun run build
-      - name: Prepare Tauri updater signing key
-        shell: bash
-        env:
-          SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-        run: |
-          set -euo pipefail
-          if [ -z "${SIGNING_PRIVATE_KEY:-}" ]; then
-            echo "TAURI_SIGNING_PRIVATE_KEY secret is not set"
-            exit 1
-          fi
-
-          KEY_FILE="$RUNNER_TEMP/tauri-signing.key"
-          printf '%s' "$SIGNING_PRIVATE_KEY" | sed 's/\\n/\n/g' | tr -d '\r' > "$KEY_FILE"
-
-          if ! grep -q '^untrusted comment:' "$KEY_FILE"; then
-            if printf '%s' "$SIGNING_PRIVATE_KEY" | base64 --decode > "$KEY_FILE.decoded" 2>/dev/null \
-              && grep -q '^untrusted comment:' "$KEY_FILE.decoded"; then
-              mv "$KEY_FILE.decoded" "$KEY_FILE"
-            else
-              echo "TAURI_SIGNING_PRIVATE_KEY is not a valid minisign private key."
-              echo "Store the full .key file contents, with newlines escaped or base64-encoded."
-              exit 1
-            fi
-          fi
-
-          chmod 600 "$KEY_FILE"
-          {
-            echo "TAURI_SIGNING_PRIVATE_KEY_PATH=$KEY_FILE"
-            echo "TAURI_SIGNING_PRIVATE_KEY<<__TAURI_SIGNING_KEY__"
-            cat "$KEY_FILE"
-            echo "__TAURI_SIGNING_KEY__"
-          } >> "$GITHUB_ENV"
-      - name: Disable Windows Authenticode signing in CI
-        shell: bash
-        run: |
-          node <<'NODE'
-          const fs = require('fs');
-          const p = 'src-tauri/tauri.windows.conf.json';
-          const c = JSON.parse(fs.readFileSync(p, 'utf8'));
-          if (c.bundle && c.bundle.windows) {
-            delete c.bundle.windows.certificateThumbprint;
-          }
-          fs.writeFileSync(p, `${JSON.stringify(c, null, 2)}\n`);
-          NODE
-      - name: Tauri build
-        env:
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: bunx @tauri-apps/cli build --target x86_64-pc-windows-msvc
-      - name: Stage MSI
-        shell: bash
-        run: |
-          mkdir -p staging/msi staging/nsis
-          cp src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi staging/msi/ || true
-          cp src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi.sig staging/msi/ || true
-          cp src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe staging/nsis/ || true
-          cp src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe.sig staging/nsis/ || true
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-msi
-          path: staging/msi/*
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-nsis
-          path: staging/nsis/*
-
   publish:
     name: Upload to Cloudflare R2
-    needs: [linux, windows]
+    needs: [linux]
     runs-on: ubuntu-22.04
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
