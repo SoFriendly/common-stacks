@@ -34,12 +34,37 @@ jobs:
       - name: Install Linux deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev xdg-utils
       - run: bun install
       - run: bun run build
+      - name: Prepare Tauri updater signing key
+        env:
+          SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SIGNING_PRIVATE_KEY:-}" ]; then
+            echo "TAURI_SIGNING_PRIVATE_KEY secret is not set"
+            exit 1
+          fi
+
+          KEY_FILE="$RUNNER_TEMP/tauri-signing.key"
+          printf '%s' "$SIGNING_PRIVATE_KEY" | sed 's/\\n/\n/g' | tr -d '\r' > "$KEY_FILE"
+
+          if ! grep -q '^untrusted comment:' "$KEY_FILE"; then
+            if printf '%s' "$SIGNING_PRIVATE_KEY" | base64 --decode > "$KEY_FILE.decoded" 2>/dev/null \
+              && grep -q '^untrusted comment:' "$KEY_FILE.decoded"; then
+              mv "$KEY_FILE.decoded" "$KEY_FILE"
+            else
+              echo "TAURI_SIGNING_PRIVATE_KEY is not a valid minisign private key."
+              echo "Store the full .key file contents, with newlines escaped or base64-encoded."
+              exit 1
+            fi
+          fi
+
+          chmod 600 "$KEY_FILE"
+          echo "TAURI_SIGNING_PRIVATE_KEY_PATH=$KEY_FILE" >> "$GITHUB_ENV"
       - name: Tauri build
         env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: bunx @tauri-apps/cli build --target ${{ matrix.target }}
       - name: Stage AppImage
@@ -74,9 +99,35 @@ jobs:
           workspaces: src-tauri
       - run: bun install
       - run: bun run build
+      - name: Prepare Tauri updater signing key
+        shell: bash
+        env:
+          SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SIGNING_PRIVATE_KEY:-}" ]; then
+            echo "TAURI_SIGNING_PRIVATE_KEY secret is not set"
+            exit 1
+          fi
+
+          KEY_FILE="$RUNNER_TEMP/tauri-signing.key"
+          printf '%s' "$SIGNING_PRIVATE_KEY" | sed 's/\\n/\n/g' | tr -d '\r' > "$KEY_FILE"
+
+          if ! grep -q '^untrusted comment:' "$KEY_FILE"; then
+            if printf '%s' "$SIGNING_PRIVATE_KEY" | base64 --decode > "$KEY_FILE.decoded" 2>/dev/null \
+              && grep -q '^untrusted comment:' "$KEY_FILE.decoded"; then
+              mv "$KEY_FILE.decoded" "$KEY_FILE"
+            else
+              echo "TAURI_SIGNING_PRIVATE_KEY is not a valid minisign private key."
+              echo "Store the full .key file contents, with newlines escaped or base64-encoded."
+              exit 1
+            fi
+          fi
+
+          chmod 600 "$KEY_FILE"
+          echo "TAURI_SIGNING_PRIVATE_KEY_PATH=$KEY_FILE" >> "$GITHUB_ENV"
       - name: Tauri build
         env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: bunx @tauri-apps/cli build --target x86_64-pc-windows-msvc
       - name: Stage MSI
