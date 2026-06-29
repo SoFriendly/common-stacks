@@ -12,7 +12,6 @@ import {
 } from "../lib/api";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { ChevronDown, Puzzle } from "lucide-react";
-import { getVersion } from "@tauri-apps/api/app";
 import {
   checkForUpdate,
   downloadAndInstall,
@@ -20,6 +19,7 @@ import {
   useUpdateStatus,
 } from "../lib/updateStore";
 import { useIsAndroid, useIsMobile } from "../lib/platform";
+import { openUrl } from "@tauri-apps/plugin-opener";
 
 export function Settings() {
   const isMobile = useIsMobile();
@@ -294,14 +294,12 @@ export function Settings() {
         <SendTargetsPanel />
       </SettingsRow>
 
-      {!isAndroid && (
-        <SettingsRow
-          title="App updates"
-          description="Common Stacks auto-checks for updates on launch."
-        >
-          <UpdatePanel />
-        </SettingsRow>
-      )}
+      <SettingsRow
+        title="App updates"
+        description="Common Stacks auto-checks for updates on launch."
+      >
+        <UpdatePanel isAndroid={isAndroid} />
+      </SettingsRow>
 
       <SettingsRow
         title="Import / Export"
@@ -355,16 +353,52 @@ function SettingsRow({
   );
 }
 
-function UpdatePanel() {
+type AndroidUpdateStatus =
+  | { kind: "idle" }
+  | { kind: "checking" }
+  | { kind: "up-to-date" }
+  | { kind: "available"; version: string; url: string; notes?: string }
+  | { kind: "error"; message: string };
+
+const ANDROID_LATEST_URL = "https://releases.commonstacks.com/latest.json";
+
+function UpdatePanel({ isAndroid }: { isAndroid: boolean }) {
   const status = useUpdateStatus();
   const [version, setVersion] = useState<string>("");
+  const [androidVersionCode, setAndroidVersionCode] = useState<number | null>(null);
   const [checking, setChecking] = useState(false);
+  const [androidStatus, setAndroidStatus] = useState<AndroidUpdateStatus>({ kind: "idle" });
 
   useEffect(() => {
-    getVersion().then(setVersion).catch(() => setVersion(""));
-  }, []);
+    api
+      .getAppVersionInfo()
+      .then((info) => {
+        setVersion(info.version);
+        setAndroidVersionCode(info.android_version_code ?? null);
+      })
+      .catch(() => setVersion(""));
+  }, [isAndroid]);
+
+  useEffect(() => {
+    setAndroidStatus({ kind: "idle" });
+  }, [isAndroid]);
 
   const statusText = (() => {
+    if (isAndroid) {
+      switch (androidStatus.kind) {
+        case "checking":
+          return "Checking…";
+        case "up-to-date":
+          return "You're on the latest version.";
+        case "available":
+          return `Update available: ${androidStatus.version}`;
+        case "error":
+          return `Error: ${androidStatus.message}`;
+        default:
+          return "";
+      }
+    }
+
     switch (status.kind) {
       case "checking":
         return "Checking…";
@@ -388,28 +422,45 @@ function UpdatePanel() {
   async function handleCheck() {
     setChecking(true);
     try {
-      await checkForUpdate();
+      if (isAndroid) {
+        await checkAndroidUpdate(version, setAndroidStatus, androidVersionCode);
+      } else {
+        await checkForUpdate();
+      }
     } finally {
       setChecking(false);
     }
   }
 
+  async function handleInstall() {
+    if (isAndroid) {
+      if (androidStatus.kind === "available") {
+        await openUrl(androidStatus.url);
+      }
+      return;
+    }
+    await downloadAndInstall();
+  }
+
   return (
     <div className="flex items-center justify-between gap-3 rounded-md border border-shelf bg-white p-3">
       <div className="min-w-0">
-        <div className="text-sm">Common Stacks {version || "—"}</div>
+        <div className="text-sm">
+          Common Stacks {version || "—"}
+          {isAndroid && androidVersionCode ? ` (${androidVersionCode})` : ""}
+        </div>
         {statusText && <div className="mt-0.5 text-xs text-ink-soft">{statusText}</div>}
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        {status.kind === "available" && (
+        {(isAndroid ? androidStatus.kind === "available" : status.kind === "available") && (
           <button
-            onClick={() => void downloadAndInstall()}
+            onClick={() => void handleInstall()}
             className="rounded-md bg-ink px-3 py-2 text-sm text-paper hover:bg-ink/90"
           >
             Install
           </button>
         )}
-        {status.kind === "ready" && (
+        {!isAndroid && status.kind === "ready" && (
           <button
             onClick={() => void restartApp()}
             className="rounded-md bg-ink px-3 py-2 text-sm text-paper hover:bg-ink/90"
@@ -419,7 +470,11 @@ function UpdatePanel() {
         )}
         <button
           onClick={handleCheck}
-          disabled={checking || status.kind === "downloading" || status.kind === "installing"}
+          disabled={
+            checking ||
+            (!isAndroid &&
+              (status.kind === "downloading" || status.kind === "installing"))
+          }
           className="rounded-md border border-shelf bg-white px-3 py-2 text-sm hover:bg-shelf disabled:opacity-50"
         >
           Check
@@ -427,6 +482,71 @@ function UpdatePanel() {
       </div>
     </div>
   );
+}
+
+async function checkAndroidUpdate(
+  currentVersion: string,
+  setAndroidStatus: (status: AndroidUpdateStatus) => void,
+  currentVersionCode?: number | null,
+) {
+  setAndroidStatus({ kind: "checking" });
+  try {
+    const currentCode = currentVersionCode ?? null;
+    const response = await fetch(ANDROID_LATEST_URL, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`Update check failed: ${response.status}`);
+    }
+    const latest = (await response.json()) as {
+      notes?: string;
+      platforms?: Record<
+        string,
+        {
+          url?: string;
+          version?: string;
+          versionName?: string;
+          versionCode?: number;
+        }
+      >;
+    };
+    const android = latest.platforms?.["android-arm64"];
+    if (!android?.url) {
+      throw new Error("Update manifest did not include an Android APK.");
+    }
+    const latestVersion = android.versionName ?? android.version ?? "";
+    const latestCode =
+      typeof android.versionCode === "number" ? android.versionCode : null;
+    const hasNewerCode =
+      latestCode !== null && currentCode !== null && latestCode > currentCode;
+    const hasNewerName =
+      latestVersion !== "" && compareVersions(latestVersion, currentVersion) > 0;
+
+    if (hasNewerCode || (currentCode === null && hasNewerName)) {
+      setAndroidStatus({
+        kind: "available",
+        version: latestVersion || String(latestCode),
+        url: android.url,
+        notes: latest.notes,
+      });
+    } else {
+      setAndroidStatus({ kind: "up-to-date" });
+    }
+  } catch (err) {
+    setAndroidStatus({
+      kind: "error",
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+function compareVersions(a: string, b: string): number {
+  const left = a.split(/[.-]/).map((part) => Number.parseInt(part, 10) || 0);
+  const right = b.split(/[.-]/).map((part) => Number.parseInt(part, 10) || 0);
+  const length = Math.max(left.length, right.length);
+  for (let i = 0; i < length; i += 1) {
+    const delta = (left[i] ?? 0) - (right[i] ?? 0);
+    if (delta !== 0) return delta;
+  }
+  return 0;
 }
 
 function SendTargetsPanel() {

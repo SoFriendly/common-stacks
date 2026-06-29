@@ -23,6 +23,13 @@ fi
 CLOUDFLARE_R2_BUCKET=${CLOUDFLARE_R2_BUCKET:-commonstacks-releases}
 APP=CommonStacks
 VERSION=$(grep '"version"' src-tauri/tauri.conf.json | head -1 | sed 's/.*"version": "\(.*\)".*/\1/')
+ANDROID_VERSION_NAME=$(sed -n 's/^tauri\.android\.versionName=//p' src-tauri/gen/android/app/tauri.properties 2>/dev/null | head -1)
+ANDROID_VERSION_CODE=$(sed -n 's/^tauri\.android\.versionCode=//p' src-tauri/gen/android/app/tauri.properties 2>/dev/null | head -1)
+[ -z "$ANDROID_VERSION_NAME" ] && ANDROID_VERSION_NAME="$VERSION"
+[ -z "$ANDROID_VERSION_CODE" ] && ANDROID_VERSION_CODE="0"
+case "$ANDROID_VERSION_CODE" in
+  ''|*[!0-9]*) ANDROID_VERSION_CODE=0 ;;
+esac
 PUBLIC_BASE="https://releases.commonstacks.com"
 R2_ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
 
@@ -93,7 +100,7 @@ NSIS_SIG=$(find artifacts/windows-nsis -name "*.exe.sig" 2>/dev/null | head -1)
 
 # --- Android (local build artifact) ---
 ANDROID_APK="src-tauri/gen/android/app/build/outputs/apk/arm64/release/app-arm64-release.apk"
-upload "$ANDROID_APK" "v${VERSION}/${APP}_${VERSION}_arm64.apk"
+upload "$ANDROID_APK" "v${ANDROID_VERSION_NAME}/${APP}_${ANDROID_VERSION_NAME}_arm64.apk"
 
 # --- latest.json merge ---
 read_sig() { [ -f "$1" ] && cat "$1" || true; }
@@ -139,6 +146,18 @@ fi
 
 add_platform "linux-x86_64" "$LINUX_X64_SIG" "${PUBLIC_BASE}/v${VERSION}/${APP}_${VERSION}_amd64.AppImage"
 add_platform "linux-aarch64" "$LINUX_ARM_SIG" "${PUBLIC_BASE}/v${VERSION}/${APP}_${VERSION}_arm64.AppImage"
+
+if [ -f "$ANDROID_APK" ]; then
+  jq --arg url "${PUBLIC_BASE}/v${ANDROID_VERSION_NAME}/${APP}_${ANDROID_VERSION_NAME}_arm64.apk" \
+     --arg version_name "$ANDROID_VERSION_NAME" \
+     --argjson version_code "$ANDROID_VERSION_CODE" \
+    '.platforms["android-arm64"] = {
+      "url": $url,
+      "versionName": $version_name,
+      "versionCode": $version_code
+    }' "$LATEST" > "${LATEST}.tmp" && mv "${LATEST}.tmp" "$LATEST"
+  UPDATED=1
+fi
 
 if [ -n "$WIN_NSIS_SIG" ]; then
   add_platform "windows-x86_64" "$WIN_NSIS_SIG" "${PUBLIC_BASE}/v${VERSION}/${APP}_${VERSION}_x64-setup.exe"

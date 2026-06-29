@@ -4,7 +4,16 @@ export interface Env {
 
 interface Latest {
   version: string;
-  platforms: Record<string, { url: string; signature: string }>;
+  platforms: Record<
+    string,
+    {
+      url: string;
+      signature?: string;
+      version?: string;
+      versionName?: string;
+      versionCode?: number;
+    }
+  >;
 }
 
 const APP = "CommonStacks";
@@ -55,7 +64,7 @@ export default {
           deb: `linux-${arch === "arm64" ? "aarch64" : "x86_64"}`,
           msi: "windows-x86_64",
           exe: "windows-x86_64",
-          apk: "",
+          apk: "android-arm64",
         };
 
         const extractVersion = (platformKey: string): string | null => {
@@ -66,7 +75,12 @@ export default {
         };
 
         const platformKey = platformForExt[ext];
-        const version = (platformKey && extractVersion(platformKey)) || latest.version;
+        const platformVersion =
+          platformKey === "android-arm64"
+            ? latest.platforms[platformKey]?.versionName ??
+              latest.platforms[platformKey]?.version
+            : platformKey && extractVersion(platformKey);
+        const version = platformVersion || latest.version;
 
         const fileMap: Record<string, string> = {
           dmg: `v${version}/${APP}_${version}_universal.dmg`,

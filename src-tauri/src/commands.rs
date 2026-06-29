@@ -14,6 +14,12 @@ use tauri::State;
 
 type CmdResult<T> = Result<T, String>;
 
+#[derive(Debug, Clone, Serialize)]
+pub struct AppVersionInfo {
+    pub version: String,
+    pub android_version_code: Option<u64>,
+}
+
 fn err<E: std::fmt::Display>(e: E) -> String {
     format!("{}", e)
 }
@@ -24,6 +30,15 @@ pub struct SourceInput {
     pub url: String,
     #[serde(default)]
     pub auth: AuthConfig,
+}
+
+#[tauri::command]
+pub fn get_app_version_info() -> AppVersionInfo {
+    AppVersionInfo {
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        android_version_code: option_env!("CS_ANDROID_VERSION_CODE")
+            .and_then(|value| value.parse::<u64>().ok()),
+    }
 }
 
 #[tauri::command]

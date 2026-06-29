@@ -15,6 +15,11 @@ fn main() {
             "../workers/kindle/.env",
             "SHARED_SECRET",
         ),
+        (
+            "CS_ANDROID_VERSION_CODE",
+            "gen/android/app/tauri.properties",
+            "tauri.android.versionCode",
+        ),
     ];
 
     for (env_var, source_rel, file_key) in secrets {

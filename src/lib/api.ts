@@ -179,7 +179,13 @@ export interface ValidateResult {
   message?: string;
 }
 
+export interface AppVersionInfo {
+  version: string;
+  android_version_code?: number | null;
+}
+
 export const api = {
+  getAppVersionInfo: () => invoke<AppVersionInfo>("get_app_version_info"),
   listSources: () => invoke<Source[]>("list_sources"),
   addSource: (input: { name: string; url: string; auth?: AuthConfig }) =>
     invoke<Source>("add_source", { input: { auth: { kind: "none" }, ...input } }),
