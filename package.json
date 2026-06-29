@@ -8,6 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "release:android": "bash scripts/release-android.sh",
+    "release:macos": "bash scripts/release.sh",
     "snapshot:landing": "bun run scripts/snapshot-landing.ts",
     "dev:landing": "vite --open /landing.html",
     "build:landing": "BUILD_TARGET=landing tsc && BUILD_TARGET=landing vite build && mv dist-landing/landing.html dist-landing/index.html",

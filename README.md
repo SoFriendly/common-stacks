@@ -71,6 +71,35 @@ bun run tauri build
 Prereqs: Rust toolchain, Bun (or Node + npm), and the platform Tauri
 requirements (Xcode CLT on macOS, etc.).
 
+## Releases
+
+Android updates are released independently from the desktop Tauri updater.
+Use the Android release script instead of manually editing versions, building,
+uploading, or installing the APK:
+
+```bash
+# bump patch version, build signed arm64 APK, upload to R2, update latest.json,
+# commit, and push the release metadata
+bun run release:android
+
+# or choose the bump explicitly
+bun run release:android -- minor
+bun run release:android -- 0.1.10
+```
+
+The script updates the tracked app versions, writes Android's generated
+`tauri.android.versionName` and `tauri.android.versionCode`, builds
+`app-arm64-release.apk`, uploads it to Cloudflare R2, and updates
+`latest.json` at `platforms["android-arm64"]`. It does not install the APK to a
+device and does not create a git tag, so it can be used to test Android updates
+without publishing a desktop update.
+
+Desktop releases still use the Tauri updater flow:
+
+```bash
+bun run release:macos -- patch
+```
+
 ### Tip: app file locations
 
 | | macOS | Linux | Windows |
