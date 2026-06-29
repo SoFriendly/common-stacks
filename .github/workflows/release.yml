@@ -62,7 +62,12 @@ jobs:
           fi
 
           chmod 600 "$KEY_FILE"
-          echo "TAURI_SIGNING_PRIVATE_KEY_PATH=$KEY_FILE" >> "$GITHUB_ENV"
+          {
+            echo "TAURI_SIGNING_PRIVATE_KEY_PATH=$KEY_FILE"
+            echo "TAURI_SIGNING_PRIVATE_KEY<<__TAURI_SIGNING_KEY__"
+            cat "$KEY_FILE"
+            echo "__TAURI_SIGNING_KEY__"
+          } >> "$GITHUB_ENV"
       - name: Tauri build
         env:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -125,7 +130,24 @@ jobs:
           fi
 
           chmod 600 "$KEY_FILE"
-          echo "TAURI_SIGNING_PRIVATE_KEY_PATH=$KEY_FILE" >> "$GITHUB_ENV"
+          {
+            echo "TAURI_SIGNING_PRIVATE_KEY_PATH=$KEY_FILE"
+            echo "TAURI_SIGNING_PRIVATE_KEY<<__TAURI_SIGNING_KEY__"
+            cat "$KEY_FILE"
+            echo "__TAURI_SIGNING_KEY__"
+          } >> "$GITHUB_ENV"
+      - name: Disable Windows Authenticode signing in CI
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const p = 'src-tauri/tauri.windows.conf.json';
+          const c = JSON.parse(fs.readFileSync(p, 'utf8'));
+          if (c.bundle && c.bundle.windows) {
+            delete c.bundle.windows.certificateThumbprint;
+          }
+          fs.writeFileSync(p, `${JSON.stringify(c, null, 2)}\n`);
+          NODE
       - name: Tauri build
         env:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
