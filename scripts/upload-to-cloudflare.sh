@@ -70,7 +70,6 @@ upload() {
 
 # --- macOS (universal) ---
 DMG="src-tauri/target/release/bundle/dmg/${APP}_${VERSION}_universal.dmg"
-[ ! -f "$DMG" ] && DMG=$(find src-tauri/target/universal-apple-darwin/release/bundle/dmg -name "*.dmg" 2>/dev/null | head -1)
 [ -n "$DMG" ] && upload "$DMG" "v${VERSION}/${APP}_${VERSION}_universal.dmg"
 
 MAC_TAR="src-tauri/target/release/bundle/${APP}_${VERSION}_darwin-universal.app.tar.gz"
@@ -122,12 +121,10 @@ s3 s3 cp "s3://${CLOUDFLARE_R2_BUCKET}/latest.json" "$LATEST" --no-progress 2>/d
 PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 jq --arg ver "$VERSION" --arg notes "$NOTES" --arg pub_date "$PUB_DATE" '
   .platforms = (.platforms // {})
-  | .version = $ver
-  | .notes = $notes
-  | .pub_date = $pub_date
 ' "$LATEST" > "${LATEST}.tmp" && mv "${LATEST}.tmp" "$LATEST"
 
 UPDATED=0
+TAURI_UPDATED=0
 add_platform() {
   local platform=$1 sig=$2 url=$3
   [ -n "$sig" ] || return 0
@@ -135,6 +132,7 @@ add_platform() {
     '.platforms[$platform] = {"signature": $sig, "url": $url}' \
     "$LATEST" > "${LATEST}.tmp" && mv "${LATEST}.tmp" "$LATEST"
   UPDATED=1
+  TAURI_UPDATED=1
 }
 
 if [ -n "$MAC_SIG" ]; then
@@ -163,6 +161,14 @@ if [ -n "$WIN_NSIS_SIG" ]; then
   add_platform "windows-x86_64" "$WIN_NSIS_SIG" "${PUBLIC_BASE}/v${VERSION}/${APP}_${VERSION}_x64-setup.exe"
 elif [ -n "$WIN_MSI_SIG" ]; then
   add_platform "windows-x86_64" "$WIN_MSI_SIG" "${PUBLIC_BASE}/v${VERSION}/${APP}_${VERSION}_x64-setup.msi"
+fi
+
+if [ "$TAURI_UPDATED" = "1" ]; then
+  jq --arg ver "$VERSION" --arg notes "$NOTES" --arg pub_date "$PUB_DATE" '
+    .version = $ver
+    | .notes = $notes
+    | .pub_date = $pub_date
+  ' "$LATEST" > "${LATEST}.tmp" && mv "${LATEST}.tmp" "$LATEST"
 fi
 
 if [ "$UPDATED" = "1" ]; then
