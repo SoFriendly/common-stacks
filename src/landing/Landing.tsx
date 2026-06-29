@@ -12,6 +12,9 @@ import {
   Check,
   ChevronDown,
   ArrowRight,
+  Wifi,
+  Filter,
+  Library as LibraryIcon,
 } from "lucide-react";
 
 function Logo({ className }: { className?: string }) {
@@ -27,6 +30,31 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
 
 type View = "library" | "book";
 type SelectedBook = { entry: LandingEntry; railTitle: string };
+type DownloadTheme = "paper" | "ink";
+
+const desktopDownloads = [
+  {
+    label: "macOS",
+    href: "https://releases.commonstacks.com/commonstacks-latest.dmg",
+  },
+  {
+    label: "Windows",
+    href: "https://releases.commonstacks.com/commonstacks-latest.exe",
+  },
+];
+
+const mobileDownloads = [
+  {
+    label: "Android",
+    href: "https://releases.commonstacks.com/commonstacks-latest.apk",
+  },
+  { label: "iOS" },
+];
+
+const headerDownloads = [
+  ...desktopDownloads,
+  mobileDownloads[0],
+];
 
 export function Landing() {
   const [view, setView] = useState<View>("library");
@@ -54,6 +82,7 @@ export function Landing() {
           )
         )}
       </PreviewWindow>
+      <MobileSection />
       <Features />
       <Plugins />
       <Sources />
@@ -64,8 +93,6 @@ export function Landing() {
 }
 
 function SiteHeader() {
-  const [open, setOpen] = useState(false);
-
   return (
     <header className="sticky top-0 z-40 border-b border-shelf/70 bg-paper/85 backdrop-blur">
       <div className="relative mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
@@ -73,64 +100,150 @@ function SiteHeader() {
           <Logo className="h-5 w-5" />
           Common Stacks
         </a>
-        <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-8 text-sm text-ink-soft md:flex">
+        <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-6 text-sm text-ink-soft md:flex">
           <a href="#features" className="transition-colors hover:text-ink">Features</a>
+          <a href="#mobile" className="transition-colors hover:text-ink">Mobile</a>
           <a href="#plugins" className="transition-colors hover:text-ink">Plugins</a>
           <a href="#sources" className="transition-colors hover:text-ink">Shelves</a>
         </nav>
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            aria-haspopup="menu"
-            aria-expanded={open}
-            className="inline-flex items-center gap-1.5 rounded-md bg-ink px-3.5 py-1.5 text-sm text-paper transition-opacity hover:opacity-90"
-          >
-            <Download className="h-3.5 w-3.5" />
-            Download
-            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
-          </button>
-          {open && (
-            <>
-              <button
-                type="button"
-                aria-hidden
-                tabIndex={-1}
-                className="fixed inset-0 z-0 cursor-default"
-                onClick={() => setOpen(false)}
-              />
-              <div
-                role="menu"
-                className="absolute right-0 z-10 mt-2 w-44 overflow-hidden rounded-md border border-shelf bg-paper shadow-lg"
-              >
-                <a
-                  href="https://releases.commonstacks.com/commonstacks-latest.dmg"
-                  role="menuitem"
-                  onClick={() => setOpen(false)}
-                  className="block px-4 py-2.5 text-sm text-ink transition-colors hover:bg-shelf"
-                >
-                  Download for macOS
-                </a>
-                <a
-                  href="https://releases.commonstacks.com/commonstacks-latest.exe"
-                  role="menuitem"
-                  onClick={() => setOpen(false)}
-                  className="block border-t border-shelf/70 px-4 py-2.5 text-sm text-ink transition-colors hover:bg-shelf"
-                >
-                  Download for Windows
-                </a>
-              </div>
-            </>
-          )}
-        </div>
+        <DownloadDropdown
+          label="Download"
+          options={headerDownloads}
+          theme="paper"
+          primary
+          compact
+        />
       </div>
     </header>
   );
 }
 
+function DownloadDropdown({
+  label,
+  options,
+  theme,
+  primary = false,
+  compact = false,
+}: {
+  label: string;
+  options: Array<{ label: string; href?: string }>;
+  theme: DownloadTheme;
+  primary?: boolean;
+  compact?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const isInk = theme === "ink";
+  const buttonClass = primary
+    ? isInk
+      ? "bg-paper text-ink hover:opacity-90"
+      : "bg-ink text-paper hover:opacity-90"
+    : isInk
+      ? "border border-paper/35 bg-paper/10 text-paper hover:bg-paper/15"
+      : "border border-spine/60 bg-shelf text-ink hover:bg-spine/25";
+  const menuClass = isInk
+    ? "border-paper/20 bg-ink text-paper shadow-2xl shadow-black/30"
+    : "border-shelf bg-paper text-ink shadow-lg";
+  const hoverClass = isInk ? "hover:bg-paper/10" : "hover:bg-shelf";
+  const disabledClass = isInk ? "text-paper/50" : "text-ink-soft";
+  const dividerClass = isInk ? "border-paper/10" : "border-shelf/70";
+
+  return (
+    <div className="relative z-30">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className={`inline-flex items-center justify-center gap-2 rounded-md text-sm transition ${
+          compact ? "px-3.5 py-1.5" : "min-w-44 px-5 py-2.5"
+        } ${buttonClass}`}
+      >
+        <Download className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
+        {label}
+        <ChevronDown
+          className={`${compact ? "h-3.5 w-3.5" : "h-4 w-4"} transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+      {open && (
+        <>
+          <button
+            type="button"
+            aria-hidden
+            tabIndex={-1}
+            className="fixed inset-0 z-40 cursor-default"
+            onClick={() => setOpen(false)}
+          />
+          <div
+            role="menu"
+            className={`absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-md border ${menuClass}`}
+          >
+            {options.map((option, index) =>
+              option.href ? (
+                <a
+                  key={option.label}
+                  href={option.href}
+                  role="menuitem"
+                  onClick={() => setOpen(false)}
+                  className={`flex items-center justify-between px-4 py-2.5 text-sm transition-colors ${hoverClass} ${
+                    index > 0 ? `border-t ${dividerClass}` : ""
+                  }`}
+                >
+                  <span>Download for {option.label}</span>
+                  <ArrowRight className="h-3.5 w-3.5 opacity-60" />
+                </a>
+              ) : (
+                <button
+                  key={option.label}
+                  type="button"
+                  role="menuitem"
+                  disabled
+                  className={`flex w-full cursor-not-allowed items-center justify-between px-4 py-2.5 text-left text-sm ${disabledClass} ${
+                    index > 0 ? `border-t ${dividerClass}` : ""
+                  }`}
+                >
+                  <span>{option.label}</span>
+                  <span className="rounded-sm border border-current/20 px-1.5 py-0.5 text-[11px] uppercase tracking-normal">
+                    Coming soon
+                  </span>
+                </button>
+              ),
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function DownloadButtonGroup({
+  theme = "paper",
+  id,
+}: {
+  theme?: DownloadTheme;
+  id?: string;
+}) {
+  return (
+    <div id={id} className="mt-9 flex flex-wrap items-center justify-center gap-3">
+      <DownloadDropdown
+        label="Download for desktop"
+        options={desktopDownloads}
+        theme={theme}
+        primary
+      />
+      <DownloadDropdown
+        label="Download for mobile"
+        options={mobileDownloads}
+        theme={theme}
+      />
+    </div>
+  );
+}
+
 function Hero() {
   return (
-    <section id="top" className="relative overflow-hidden">
+    <section id="top" className="relative">
       <div className="pointer-events-none absolute inset-0 -z-10 opacity-[0.06]">
         <div
           className="absolute inset-0"
@@ -155,22 +268,7 @@ function Hero() {
             Every library you follow, in one place — searched together, sent to your
             reader in two clicks.
           </p>
-          <div id="download" className="mt-9 flex flex-wrap items-center justify-center gap-3">
-            <a
-              href="https://releases.commonstacks.com/commonstacks-latest.dmg"
-              className="inline-flex items-center gap-2 rounded-md bg-ink px-5 py-2.5 text-sm text-paper transition-opacity hover:opacity-90"
-            >
-              <Download className="h-4 w-4" />
-              Download for macOS
-            </a>
-            <a
-              href="https://releases.commonstacks.com/commonstacks-latest.exe"
-              className="inline-flex items-center gap-2 rounded-md border border-shelf bg-paper px-5 py-2.5 text-sm text-ink transition-colors hover:bg-shelf"
-            >
-              <Download className="h-4 w-4" />
-              Download for Windows
-            </a>
-          </div>
+          <DownloadButtonGroup id="download" />
           <p className="mt-5 text-sm text-ink-soft">
             Free, open source, and local. No accounts, no telemetry.
           </p>
@@ -213,6 +311,169 @@ function PreviewWindow({ children }: { children: React.ReactNode }) {
               }}
             />
           </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AndroidScreenMock({ entries }: { entries: LandingEntry[] }) {
+  const featured = entries[0];
+  const shelf = entries.slice(0, 6);
+
+  return (
+    <div className="mx-auto w-full max-w-[21rem] rounded-[2rem] bg-ink p-2 shadow-2xl shadow-black/25 ring-1 ring-black/10">
+      <div className="relative overflow-hidden rounded-[1.5rem] bg-paper">
+        <div className="flex items-center justify-between bg-ink px-5 pt-3 pb-2 text-[11px] text-paper">
+          <span className="tabular-nums">9:41</span>
+          <div className="flex items-center gap-1">
+            <Wifi className="h-3 w-3" />
+            <span className="h-2.5 w-5 rounded-[3px] border border-paper/70">
+              <span className="block h-full w-3 rounded-[2px] bg-paper" />
+            </span>
+          </div>
+        </div>
+
+        <div className="border-b border-shelf/60 bg-paper/95 backdrop-blur-xl">
+          <div className="flex min-h-14 items-center gap-2 px-3">
+            <div className="flex w-11 items-center justify-start">
+              <span className="flex h-11 w-11 items-center justify-center rounded-full text-ink-soft">
+                <Filter className="h-4 w-4" />
+              </span>
+            </div>
+            <div className="min-w-0 flex-1 text-center">
+              <div className="truncate font-display text-base tracking-tight text-ink">
+                Downloads
+              </div>
+            </div>
+            <div className="flex w-11 items-center justify-end" />
+          </div>
+        </div>
+
+        <div className="px-4 pt-4 pb-24">
+          <div className="mb-4 flex items-baseline justify-between gap-3">
+            <div>
+              <div className="font-display text-lg tracking-tight">Downloaded books</div>
+              <div className="text-xs text-ink-soft">Ready to open or send</div>
+            </div>
+            <span className="text-xs text-ink-soft">{shelf.length} downloads</span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-x-3 gap-y-5">
+            {shelf.map((entry, index) => (
+              <div key={`${entry.id}:${index}`} className="group/card flex min-w-0 flex-col">
+                <div className="relative">
+                  <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-shelf shadow-sm ring-1 ring-black/5">
+                    <MiniCover entry={entry} className="h-full w-full rounded-lg" />
+                  </div>
+                  {index === 0 && (
+                    <span className="absolute top-1.5 left-1.5 rounded-full bg-ink/85 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-paper backdrop-blur-sm">
+                      EPUB
+                    </span>
+                  )}
+                </div>
+                <div className="mt-2 line-clamp-2 font-display text-sm leading-snug text-ink">
+                  {entry.title}
+                </div>
+                <div className="line-clamp-1 text-xs text-ink-soft">
+                  {entry.authors[0] ?? "Unknown"}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="absolute inset-0 z-20 flex items-end justify-center bg-black/25">
+          <div className="w-full rounded-t-3xl bg-paper px-4 pt-3 pb-4 shadow-2xl ring-1 ring-black/5">
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-spine/70" />
+            <div className="mb-3 line-clamp-2 px-1 font-display text-lg leading-tight text-ink">
+              {featured?.title ?? "Downloaded book"}
+            </div>
+            <div className="overflow-hidden rounded-2xl border border-shelf bg-white/55">
+              {["Open", "Send to Kindle", "Send to Crosspoint", "Rename...", "Delete"].map((item) => (
+                <div
+                  key={item}
+                  className={`flex min-h-12 items-center border-b border-shelf px-3 text-base last:border-b-0 ${
+                    item === "Delete" ? "text-red-700" : "text-ink"
+                  }`}
+                >
+                  {item}
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 flex min-h-12 w-full items-center justify-center rounded-2xl bg-shelf text-base font-medium text-ink">
+              Cancel
+            </div>
+          </div>
+        </div>
+
+        <nav className="absolute inset-x-0 bottom-0 z-10 border-t border-shelf/70 bg-paper/96 px-2 pt-1.5 pb-2 shadow-[0_-4px_16px_rgba(26,24,20,0.06)] backdrop-blur-xl">
+          <div className="mx-auto grid max-w-md grid-cols-3">
+            <MockTab label="Library" Icon={LibraryIcon} />
+            <MockTab label="Downloads" Icon={Download} active />
+            <MockTab label="Settings" Icon={SettingsIcon} />
+          </div>
+        </nav>
+      </div>
+    </div>
+  );
+}
+
+function MockTab({
+  label,
+  Icon,
+  active = false,
+}: {
+  label: string;
+  Icon: typeof Download;
+  active?: boolean;
+}) {
+  return (
+    <div className="flex min-h-[4.25rem] flex-col items-center justify-center gap-0.5 rounded-2xl px-1 text-[11px] font-medium text-ink-soft">
+      <span
+        className={`flex h-8 w-16 items-center justify-center rounded-full ${
+          active ? "bg-accent/14 text-accent" : "text-ink-soft"
+        }`}
+      >
+        <Icon className="h-5 w-5" strokeWidth={active ? 2.35 : 1.95} />
+      </span>
+      <span className={`leading-5 ${active ? "font-semibold text-accent" : "text-ink-soft"}`}>
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function MobileSection() {
+  const withCovers = data.rails.flatMap((r) => r.entries).filter((e) => e.cover);
+
+  return (
+    <section id="mobile" className="overflow-hidden bg-shelf/45 py-24 md:py-28">
+      <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 md:grid-cols-[0.95fr_1.05fr] md:gap-16">
+        <div>
+          <Eyebrow>Common Stacks on mobile</Eyebrow>
+          <h2 className="mt-3 max-w-[15ch] font-display text-4xl tracking-tight text-balance md:text-5xl">
+            Send to your reader from anywhere.
+          </h2>
+          <p className="mt-5 max-w-md text-base leading-relaxed text-ink-soft text-pretty md:text-lg">
+            Search the same connected shelves from your phone, pick the format you want,
+            and send it to Kindle, Crosspoint, or another configured reader while you are
+            away from the desktop app.
+          </p>
+          <div className="mt-8 flex max-w-md flex-col gap-3 border-l border-spine/60 pl-4 text-sm text-ink-soft">
+            <div className="flex items-baseline justify-between gap-4">
+              <span className="font-display text-base text-ink">Android</span>
+              <span>APK available now</span>
+            </div>
+            <div className="flex items-baseline justify-between gap-4">
+              <span className="font-display text-base text-ink">iOS</span>
+              <span>Coming soon</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="relative">
+          <AndroidScreenMock entries={withCovers} />
         </div>
       </div>
     </section>
@@ -688,8 +949,8 @@ function Plugins() {
 
 function Sources() {
   // Show a wall of covers across all rails as social proof of "real catalogs".
-  const all = data.rails.flatMap((r) => r.entries);
-  const sample = all.slice(0, 16);
+  const all = data.rails.flatMap((r) => r.entries).filter((e) => e.cover);
+  const sample = all.slice(0, 24);
   return (
     <section id="sources" className="py-24 md:py-28">
       <div className="mx-auto max-w-6xl px-6">
@@ -712,9 +973,9 @@ function Sources() {
           </p>
         </div>
         <div className="mt-14 grid grid-cols-4 gap-3 sm:grid-cols-6 md:grid-cols-8">
-          {sample.map((e) => (
+          {sample.map((e, index) => (
             <div
-              key={e.id}
+              key={`${e.id}:${index}`}
               className="aspect-[2/3] overflow-hidden rounded-md bg-shelf shadow-sm ring-1 ring-black/5 transition-transform duration-200 hover:-translate-y-1"
             >
               {e.cover && (
@@ -750,22 +1011,7 @@ function ClosingCta() {
         <h2 className="mx-auto mt-3 max-w-[18ch] font-display text-4xl tracking-tight text-balance md:text-6xl">
           Your whole library, two clicks away.
         </h2>
-        <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-          <a
-            href="https://releases.commonstacks.com/commonstacks-latest.dmg"
-            className="inline-flex items-center gap-2 rounded-md bg-paper px-5 py-2.5 text-sm text-ink transition-opacity hover:opacity-90"
-          >
-            <Download className="h-4 w-4" />
-            Download for macOS
-          </a>
-          <a
-            href="https://releases.commonstacks.com/commonstacks-latest.exe"
-            className="inline-flex items-center gap-2 rounded-md border border-paper/25 px-5 py-2.5 text-sm text-paper transition-colors hover:bg-paper/10"
-          >
-            <Download className="h-4 w-4" />
-            Download for Windows
-          </a>
-        </div>
+        <DownloadButtonGroup theme="ink" />
         <p className="mt-5 text-sm text-paper/60">
           Free, open source, and local. No accounts, no telemetry.
         </p>
