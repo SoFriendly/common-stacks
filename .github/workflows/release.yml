@@ -62,15 +62,15 @@ jobs:
           fi
 
           chmod 600 "$KEY_FILE"
-          KEY_PAYLOAD=$(grep -v '^untrusted comment:' "$KEY_FILE" | tr -d '\n')
-          if [ -z "$KEY_PAYLOAD" ]; then
-            echo "TAURI_SIGNING_PRIVATE_KEY does not contain a secret key payload."
+          KEY_B64=$(base64 < "$KEY_FILE" | tr -d '\n')
+          if [ -z "$KEY_B64" ]; then
+            echo "TAURI_SIGNING_PRIVATE_KEY could not be encoded for Tauri."
             exit 1
           fi
 
           {
             echo "TAURI_SIGNING_PRIVATE_KEY_PATH=$KEY_FILE"
-            echo "TAURI_SIGNING_PRIVATE_KEY=$KEY_PAYLOAD"
+            echo "TAURI_SIGNING_PRIVATE_KEY=$KEY_B64"
           } >> "$GITHUB_ENV"
       - name: Tauri build
         env:
