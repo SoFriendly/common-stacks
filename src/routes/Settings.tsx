@@ -14,10 +14,11 @@ import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialo
 import { ChevronDown, Puzzle } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
 import { checkForUpdate, useUpdateStatus } from "../lib/updateStore";
-import { useIsMobile } from "../lib/platform";
+import { useIsAndroid, useIsMobile } from "../lib/platform";
 
 export function Settings() {
   const isMobile = useIsMobile();
+  const isAndroid = useIsAndroid();
   const [sources, setSources] = useState<Source[]>([]);
   const [downloadDir, setDownloadDir] = useState<string>("");
 
@@ -55,12 +56,14 @@ export function Settings() {
 
   async function refresh() {
     setSources(await api.listSources());
-    setDownloadDir(await api.getDownloadDir());
+    if (!isAndroid) {
+      setDownloadDir(await api.getDownloadDir());
+    }
   }
 
   useEffect(() => {
     refresh();
-  }, []);
+  }, [isAndroid]);
 
   async function handleValidate() {
     if (!newUrl) return;
@@ -260,22 +263,24 @@ export function Settings() {
         </div>
       </SettingsRow>
 
-      <SettingsRow
-        title="Download folder"
-        description="Where downloaded books are saved on this machine."
-      >
-        <div className="flex items-center gap-3">
-          <code className="flex-1 rounded-md border border-shelf bg-white px-3 py-2 text-xs">
-            {downloadDir}
-          </code>
-          <button
-            onClick={handlePickDir}
-            className="rounded-md border border-shelf bg-white px-3 py-2 text-sm hover:bg-shelf"
-          >
-            Change…
-          </button>
-        </div>
-      </SettingsRow>
+      {!isAndroid && (
+        <SettingsRow
+          title="Download folder"
+          description="Where downloaded books are saved on this machine."
+        >
+          <div className="flex items-center gap-3">
+            <code className="flex-1 rounded-md border border-shelf bg-white px-3 py-2 text-xs">
+              {downloadDir}
+            </code>
+            <button
+              onClick={handlePickDir}
+              className="rounded-md border border-shelf bg-white px-3 py-2 text-sm hover:bg-shelf"
+            >
+              Change…
+            </button>
+          </div>
+        </SettingsRow>
+      )}
 
       <SettingsRow
         title="Send-to targets"

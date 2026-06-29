@@ -16,11 +16,22 @@ function matchesMobile(): boolean {
   return /Android|iPhone|iPad|iPod/i.test(ua) || isIpad;
 }
 
+function matchesAndroid(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android/i.test(navigator.userAgent);
+}
+
 export const isMobile = matchesMobile();
+export const isAndroid = matchesAndroid();
 
 // Device class doesn't change at runtime, so no media-query listener.
 export function useIsMobile(): boolean {
   const [value] = useState(matchesMobile);
+  return value;
+}
+
+export function useIsAndroid(): boolean {
+  const [value] = useState(matchesAndroid);
   return value;
 }
 
