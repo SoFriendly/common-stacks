@@ -91,6 +91,10 @@ NSIS=$(find artifacts/windows-nsis -name "*.exe" 2>/dev/null | head -1)
 NSIS_SIG=$(find artifacts/windows-nsis -name "*.exe.sig" 2>/dev/null | head -1)
 [ -n "$NSIS_SIG" ] && upload "$NSIS_SIG" "v${VERSION}/${APP}_${VERSION}_x64-setup.exe.sig"
 
+# --- Android (local build artifact) ---
+ANDROID_APK="src-tauri/gen/android/app/build/outputs/apk/arm64/release/app-arm64-release.apk"
+upload "$ANDROID_APK" "v${VERSION}/${APP}_${VERSION}_arm64.apk"
+
 # --- latest.json merge ---
 read_sig() { [ -f "$1" ] && cat "$1" || true; }
 

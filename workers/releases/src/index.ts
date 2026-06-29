@@ -37,7 +37,7 @@ export default {
     // Stable "latest" download URLs that redirect to the current version's artifact.
     // Pattern: commonstacks-latest[-arm64|-amd64].<ext>
     const latestMatch = key.match(
-      /^commonstacks-latest(?:-(arm64|amd64))?\.(dmg|AppImage|deb|msi|exe)$/,
+      /^commonstacks-latest(?:-(arm64|amd64))?\.(dmg|AppImage|deb|msi|exe|apk)$/,
     );
     if (latestMatch) {
       try {
@@ -55,6 +55,7 @@ export default {
           deb: `linux-${arch === "arm64" ? "aarch64" : "x86_64"}`,
           msi: "windows-x86_64",
           exe: "windows-x86_64",
+          apk: "",
         };
 
         const extractVersion = (platformKey: string): string | null => {
@@ -73,6 +74,7 @@ export default {
           deb: `v${version}/${APP}_${version}_${archSuffix}.deb`,
           msi: `v${version}/${APP}_${version}_x64-setup.msi`,
           exe: `v${version}/${APP}_${version}_x64-setup.exe`,
+          apk: `v${version}/${APP}_${version}_arm64.apk`,
         };
 
         const target = fileMap[ext];
@@ -94,6 +96,8 @@ export default {
       else if (key.endsWith(".dmg")) headers.set("Content-Type", "application/x-apple-diskimage");
       else if (key.endsWith(".exe") || key.endsWith(".msi"))
         headers.set("Content-Type", "application/octet-stream");
+      else if (key.endsWith(".apk"))
+        headers.set("Content-Type", "application/vnd.android.package-archive");
       else if (key.endsWith(".AppImage")) headers.set("Content-Type", "application/x-executable");
       else if (key.endsWith(".deb")) headers.set("Content-Type", "application/vnd.debian.binary-package");
       else if (key.endsWith(".tar.gz")) headers.set("Content-Type", "application/gzip");
