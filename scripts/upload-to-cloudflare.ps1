@@ -141,6 +141,15 @@ if (-not $latest.platforms) {
     $latest | Add-Member -NotePropertyName platforms -NotePropertyValue ([PSCustomObject]@{}) -Force
 }
 
+$unsignedPlatforms = @(
+    $latest.platforms.PSObject.Properties |
+        Where-Object { $null -eq $_.Value.signature } |
+        ForEach-Object { $_.Name }
+)
+foreach ($platform in $unsignedPlatforms) {
+    $latest.platforms.PSObject.Properties.Remove($platform)
+}
+
 $latest | Add-Member -NotePropertyName version  -NotePropertyValue $VERSION -Force
 $latest | Add-Member -NotePropertyName notes    -NotePropertyValue $NOTES -Force
 $latest | Add-Member -NotePropertyName pub_date -NotePropertyValue ((Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")) -Force

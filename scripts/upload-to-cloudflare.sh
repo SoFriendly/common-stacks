@@ -103,6 +103,22 @@ upload "$ANDROID_APK" "v${ANDROID_VERSION_NAME}/${APP}_${ANDROID_VERSION_NAME}_a
 
 # --- latest.json merge ---
 read_sig() { [ -f "$1" ] && cat "$1" || true; }
+sign_artifact() {
+  local file=$1
+  [ -f "$file" ] || return 0
+  [ -f "${file}.sig" ] && return 0
+
+  if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ] && [ -z "$TAURI_SIGNING_PRIVATE_KEY_PATH" ]; then
+    echo "Warning: no Tauri updater signing key; skipping signature for $file"
+    return 0
+  fi
+
+  if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+    TAURI_SIGNING_PRIVATE_KEY_PATH= bunx tauri signer sign "$file"
+  else
+    bunx tauri signer sign "$file"
+  fi
+}
 
 MAC_SIG=$(read_sig "${MAC_TAR}.sig")
 LINUX_X64_SIG=$(read_sig "$(find artifacts/linux-appimage-x86_64 -name "*.AppImage.sig" 2>/dev/null | head -1)")
@@ -113,6 +129,12 @@ LINUX_ARM_SIG=$(read_sig "$(find artifacts/linux-appimage-aarch64 -name "*.AppIm
 WIN_NSIS_SIG=$(read_sig "$(find artifacts/windows-nsis -name "*.exe.sig" 2>/dev/null | head -1)")
 WIN_MSI_SIG=$(read_sig "$(find artifacts/windows-msi -name "*.msi.sig" 2>/dev/null | head -1)")
 
+if [ -f "$ANDROID_APK" ]; then
+  sign_artifact "$ANDROID_APK"
+  upload "${ANDROID_APK}.sig" "v${ANDROID_VERSION_NAME}/${APP}_${ANDROID_VERSION_NAME}_arm64.apk.sig"
+fi
+ANDROID_SIG=$(read_sig "${ANDROID_APK}.sig")
+
 LATEST=src-tauri/target/release/bundle/latest.json
 mkdir -p "$(dirname "$LATEST")"
 s3 s3 cp "s3://${CLOUDFLARE_R2_BUCKET}/latest.json" "$LATEST" --no-progress 2>/dev/null \
@@ -121,6 +143,7 @@ s3 s3 cp "s3://${CLOUDFLARE_R2_BUCKET}/latest.json" "$LATEST" --no-progress 2>/d
 PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 jq --arg ver "$VERSION" --arg notes "$NOTES" --arg pub_date "$PUB_DATE" '
   .platforms = (.platforms // {})
+  | .platforms |= with_entries(select(.value.signature? != null))
 ' "$LATEST" > "${LATEST}.tmp" && mv "${LATEST}.tmp" "$LATEST"
 
 UPDATED=0
@@ -145,16 +168,20 @@ fi
 add_platform "linux-x86_64" "$LINUX_X64_SIG" "${PUBLIC_BASE}/v${VERSION}/${APP}_${VERSION}_amd64.AppImage"
 add_platform "linux-aarch64" "$LINUX_ARM_SIG" "${PUBLIC_BASE}/v${VERSION}/${APP}_${VERSION}_arm64.AppImage"
 
-if [ -f "$ANDROID_APK" ]; then
+if [ -f "$ANDROID_APK" ] && [ -n "$ANDROID_SIG" ]; then
   jq --arg url "${PUBLIC_BASE}/v${ANDROID_VERSION_NAME}/${APP}_${ANDROID_VERSION_NAME}_arm64.apk" \
+     --arg sig "$ANDROID_SIG" \
      --arg version_name "$ANDROID_VERSION_NAME" \
      --argjson version_code "$ANDROID_VERSION_CODE" \
     '.platforms["android-arm64"] = {
       "url": $url,
+      "signature": $sig,
       "versionName": $version_name,
       "versionCode": $version_code
     }' "$LATEST" > "${LATEST}.tmp" && mv "${LATEST}.tmp" "$LATEST"
   UPDATED=1
+elif [ -f "$ANDROID_APK" ]; then
+  echo "Warning: Android APK was uploaded but not added to latest.json because no .sig was available"
 fi
 
 if [ -n "$WIN_NSIS_SIG" ]; then

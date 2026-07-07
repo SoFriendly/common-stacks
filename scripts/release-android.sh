@@ -55,6 +55,12 @@ if [ "$BUMP" != "--no-bump" ]; then
 fi
 
 VERSION=$(grep '"version"' src-tauri/tauri.conf.json | head -1 | sed 's/.*"version": "\(.*\)".*/\1/')
+if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ] && [ -z "$TAURI_SIGNING_PRIVATE_KEY_PATH" ]; then
+  echo "Error: TAURI_SIGNING_PRIVATE_KEY (or _PATH) is not set"
+  echo "Android latest.json entries must include a Tauri updater signature so desktop updaters can parse the shared manifest."
+  exit 1
+fi
+
 ANDROID_PROPS=src-tauri/gen/android/app/tauri.properties
 if [ ! -f "$ANDROID_PROPS" ]; then
   IFS='.' read -r MAJ MIN PAT <<< "$VERSION"
