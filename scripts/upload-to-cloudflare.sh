@@ -190,12 +190,14 @@ elif [ -n "$WIN_MSI_SIG" ]; then
   add_platform "windows-x86_64" "$WIN_MSI_SIG" "${PUBLIC_BASE}/v${VERSION}/${APP}_${VERSION}_x64-setup.msi"
 fi
 
-if [ "$TAURI_UPDATED" = "1" ]; then
+if [ -n "$MAC_SIG" ]; then
   jq --arg ver "$VERSION" --arg notes "$NOTES" --arg pub_date "$PUB_DATE" '
     .version = $ver
     | .notes = $notes
     | .pub_date = $pub_date
   ' "$LATEST" > "${LATEST}.tmp" && mv "${LATEST}.tmp" "$LATEST"
+elif [ "$TAURI_UPDATED" = "1" ]; then
+  echo "Preserving existing Tauri manifest version because no macOS updater artifact was uploaded"
 fi
 
 if [ "$UPDATED" = "1" ]; then
