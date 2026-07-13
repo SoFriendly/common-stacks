@@ -30,6 +30,11 @@ pub async fn list(state: &AppState) -> Result<Vec<DownloadedFile>> {
         if !path.is_file() {
             continue;
         }
+        // Hidden files (.DS_Store, .localized, dotfiles in general) aren't
+        // downloads the user made — keep them out of the shelf.
+        if entry.file_name().to_string_lossy().starts_with('.') {
+            continue;
+        }
         let meta = entry.metadata()?;
         let modified_ms = meta
             .modified()
@@ -47,6 +52,27 @@ pub async fn list(state: &AppState) -> Result<Vec<DownloadedFile>> {
     }
     out.sort_by(|a, b| b.modified_ms.cmp(&a.modified_ms));
     Ok(out)
+}
+
+/// Locate an already-downloaded copy of a book, if one exists. Mirrors the
+/// naming used by `download_book` (build_filename), so a hit means the exact
+/// file a fresh download would have produced is already on disk.
+pub async fn find_existing(
+    state: &AppState,
+    title: &str,
+    author: Option<&str>,
+    ext: &str,
+) -> Result<Option<PathBuf>> {
+    let dir = {
+        let cfg = state.config.read().await;
+        resolved_download_dir(&cfg)
+    };
+    let path = dir.join(build_filename(title, author, ext));
+    if path.is_file() {
+        Ok(Some(path))
+    } else {
+        Ok(None)
+    }
 }
 
 pub fn build_filename(title: &str, author: Option<&str>, ext: &str) -> String {

@@ -81,6 +81,7 @@ pub fn run() {
             commands::search,
             commands::download_book,
             commands::list_downloads,
+            commands::find_download,
             commands::inspect_download,
             commands::open_download,
             commands::reveal_download,

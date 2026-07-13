@@ -249,14 +249,7 @@ pub async fn download_book(
         .await
         .map_err(err)?;
 
-    let ext = ext_from_href(&request.href)
-        .or_else(|| {
-            request
-                .mime
-                .as_deref()
-                .and_then(downloads::ext_from_mime)
-                .map(|s| s.to_string())
-        })
+    let ext = resolve_ext(&request.href, request.mime.as_deref())
         .or_else(|| {
             ct.as_deref()
                 .and_then(downloads::ext_from_mime)
@@ -275,6 +268,13 @@ pub async fn download_book(
     Ok(DownloadResult { path })
 }
 
+fn resolve_ext(href: &str, mime: Option<&str>) -> Option<String> {
+    ext_from_href(href).or_else(|| {
+        mime.and_then(downloads::ext_from_mime)
+            .map(|s| s.to_string())
+    })
+}
+
 fn ext_from_href(href: &str) -> Option<String> {
     let stripped = href.split(&['?', '#'][..]).next().unwrap_or(href);
     let last = stripped.rsplit('/').next().unwrap_or("");
@@ -289,6 +289,28 @@ fn ext_from_href(href: &str) -> Option<String> {
 #[tauri::command]
 pub async fn list_downloads(state: State<'_, AppState>) -> CmdResult<Vec<DownloadedFile>> {
     downloads::list(&state).await.map_err(err)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct FindDownloadRequest {
+    pub title: String,
+    pub author: Option<String>,
+    pub href: String,
+    pub mime: Option<String>,
+}
+
+/// Returns the path of an already-downloaded copy of this acquisition, if the
+/// file `download_book` would create already exists.
+#[tauri::command]
+pub async fn find_download(
+    state: State<'_, AppState>,
+    request: FindDownloadRequest,
+) -> CmdResult<Option<PathBuf>> {
+    let ext = resolve_ext(&request.href, request.mime.as_deref())
+        .unwrap_or_else(|| "bin".to_string());
+    downloads::find_existing(&state, &request.title, request.author.as_deref(), &ext)
+        .await
+        .map_err(err)
 }
 
 #[tauri::command]

@@ -199,6 +199,34 @@ export function Book() {
     return out;
   }, [entry]);
 
+  // Check which formats are already on disk so we can offer "Open in
+  // Downloads" instead of re-downloading a book the user already has.
+  const [existingPaths, setExistingPaths] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!entry || acquisitions.length === 0) return;
+    let cancelled = false;
+    for (const a of acquisitions) {
+      api
+        .findDownload({
+          title: entry.title,
+          author: entry.authors[0],
+          href: a.href,
+          mime: a.mime,
+        })
+        .then((path) => {
+          if (cancelled || !path) return;
+          setExistingPaths((prev) => ({ ...prev, [a.href]: path }));
+        })
+        .catch(() => {
+          // best-effort — worst case we just show the download button.
+        });
+    }
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [acquisitions]);
+
   // All hooks must run unconditionally — keep these above the early return.
   const cover = entry?.cover ?? entry?.thumbnail;
   type CoverLoadState = "loading" | "real" | "failed";
@@ -402,8 +430,10 @@ export function Book() {
                 const downloading =
                   downloadState.kind === "downloading" &&
                   downloadState.href === a.href;
+                const alreadyDownloaded = !!existingPaths[a.href];
                 const done =
-                  downloadState.kind === "done" && downloadState.href === a.href;
+                  (downloadState.kind === "done" && downloadState.href === a.href) ||
+                  alreadyDownloaded;
                 const failed =
                   downloadState.kind === "error" && downloadState.href === a.href;
                 return (
@@ -420,7 +450,11 @@ export function Book() {
                             : "rounded-md bg-ink px-4 py-2 text-sm text-paper"
                         }
                       >
-                        View in Downloads
+                        {alreadyDownloaded && formatLabel(a) !== "Download"
+                          ? `Open ${formatLabel(a)} in Downloads`
+                          : alreadyDownloaded
+                            ? "Open in Downloads"
+                            : "View in Downloads"}
                       </button>
                     ) : (
                       <button

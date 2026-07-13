@@ -208,6 +208,12 @@ export const api = {
   }) => invoke<{ path: string }>("download_book", { request }),
 
   listDownloads: () => invoke<DownloadedFile[]>("list_downloads"),
+  findDownload: (request: {
+    title: string;
+    author?: string;
+    href: string;
+    mime?: string;
+  }) => invoke<string | null>("find_download", { request }),
   inspectDownload: (path: string) => invoke<EpubMetadata>("inspect_download", { path }),
   openDownload: (path: string) => invoke<void>("open_download", { path }),
   revealDownload: (path: string) => invoke<void>("reveal_download", { path }),
