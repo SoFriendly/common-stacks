@@ -114,7 +114,9 @@ sign_artifact() {
   fi
 
   if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
-    TAURI_SIGNING_PRIVATE_KEY_PATH= bunx tauri signer sign "$file"
+    # env -u, not VAR=: an empty-but-set TAURI_SIGNING_PRIVATE_KEY_PATH makes
+    # the CLI treat --private-key-path as supplied with no value and abort.
+    env -u TAURI_SIGNING_PRIVATE_KEY_PATH bunx tauri signer sign "$file"
   else
     bunx tauri signer sign "$file"
   fi

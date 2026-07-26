@@ -14,7 +14,7 @@ if [ "$CURRENT_BRANCH" != "main" ]; then
   [[ ! $REPLY =~ ^[Yy]$ ]] && exit 1
 fi
 
-if ! git diff --quiet --exit-code -- ':!src-tauri/tauri.conf.json' ':!src-tauri/Cargo.toml' ':!src-tauri/Cargo.lock' ':!package.json'; then
+if ! git diff --quiet --exit-code -- ':!src-tauri/tauri.conf.json' ':!src-tauri/Cargo.toml' ':!src-tauri/Cargo.lock' ':!package.json' ':!package-lock.json'; then
   echo "Error: uncommitted changes outside version files."
   echo "Commit or stash them, then re-run."
   exit 1

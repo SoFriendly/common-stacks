@@ -103,7 +103,7 @@ if [ "$BUMP" != "--no-bump" ]; then
   else
     echo ""
     echo "=== Committing version bump ==="
-    git add src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock package.json
+    git add src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock package.json package-lock.json
     git commit -m "Release v$VERSION"
     git tag -a "v$VERSION" -m "Release v$VERSION"
     if [ "$UPLOAD" = "1" ]; then
