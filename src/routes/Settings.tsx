@@ -19,6 +19,7 @@ import {
   useUpdateStatus,
 } from "../lib/updateStore";
 import { useIsAndroid, useIsMobile } from "../lib/platform";
+import { setLibbyEnabled, useLibbyEnabled } from "../lib/libbyPref";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
 export function Settings() {
@@ -170,6 +171,7 @@ export function Settings() {
               onSaved={refresh}
             />
           ))}
+          {!isMobile && <LibbyRow />}
         </div>
       </SettingsRow>
 
@@ -740,6 +742,36 @@ function SendTargetForm({
         </button>
       </div>
     </form>
+  );
+}
+
+// Libby isn't an OPDS source, but from the user's point of view it's just
+// another library — so it lives in the Libraries list. Toggling it shows or
+// hides the embedded libbyapp.com tab.
+function LibbyRow() {
+  const enabled = useLibbyEnabled();
+
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-shelf p-4 last:border-b-0">
+      <div className="min-w-0">
+        <div className="font-display text-lg">Libby</div>
+        <div className="text-xs text-ink-soft">
+          Borrow from your public library in an embedded libbyapp.com tab —
+          downloads land in your Downloads shelf.
+        </div>
+      </div>
+      <Toggle
+        checked={enabled}
+        title={enabled ? "Enabled — Libby tab is visible" : "Disabled — Libby tab is hidden"}
+        onChange={async (next) => {
+          try {
+            await setLibbyEnabled(next);
+          } catch (e) {
+            window.alert(`Could not save: ${e}`);
+          }
+        }}
+      />
+    </div>
   );
 }
 

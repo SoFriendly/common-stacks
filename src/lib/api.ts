@@ -89,6 +89,9 @@ export interface DownloadedFile {
   size: number;
   modified_ms: number;
   extension?: string;
+  loan_title?: string;
+  loan_author?: string;
+  loan_cover_data_url?: string;
 }
 
 export interface PluginDescriptor {
@@ -179,6 +182,13 @@ export interface ValidateResult {
   message?: string;
 }
 
+export interface LibbyBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface AppVersionInfo {
   version: string;
   android_version_code?: number | null;
@@ -228,6 +238,14 @@ export const api = {
   exportConfigToPath: (path: string) => invoke<void>("export_config_to_path", { path }),
   importConfig: (json: string) => invoke<void>("import_config", { json }),
   importConfigFromPath: (path: string) => invoke<void>("import_config_from_path", { path }),
+
+  getLibbyEnabled: () => invoke<boolean>("get_libby_enabled"),
+  setLibbyEnabled: (enabled: boolean) => invoke<void>("set_libby_enabled", { enabled }),
+  libbyShow: (bounds: LibbyBounds) => invoke<void>("libby_show", { bounds }),
+  libbyHide: () => invoke<void>("libby_hide"),
+  libbySetBounds: (bounds: LibbyBounds) => invoke<void>("libby_set_bounds", { bounds }),
+  libbyBack: () => invoke<void>("libby_back"),
+  libbyReload: () => invoke<void>("libby_reload"),
 
   listPlugins: () => invoke<InstalledPlugin[]>("list_plugins"),
   pluginsDir: () => invoke<string>("plugins_dir"),

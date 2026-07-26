@@ -5,6 +5,7 @@ import { Downloads } from "./routes/Downloads";
 import { Settings } from "./routes/Settings";
 import { Browse } from "./routes/Browse";
 import { Book } from "./routes/Book";
+import { Libby } from "./routes/Libby";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { UpdateChecker } from "./components/UpdateChecker";
 import { MobileHeader } from "./components/MobileHeader";
@@ -43,6 +44,7 @@ export default function App() {
                 <Route path="/browse" element={<Browse />} />
                 <Route path="/book" element={<Book />} />
                 <Route path="/downloads" element={<Downloads />} />
+                <Route path="/libby" element={<Libby />} />
                 <Route path="/settings" element={<Settings />} />
               </Routes>
             </ErrorBoundary>

@@ -467,6 +467,7 @@ fn mime_for(filename: &str) -> &'static str {
         "pdf" => "application/pdf",
         "mobi" => "application/x-mobipocket-ebook",
         "azw3" => "application/vnd.amazon.ebook",
+        "acsm" => "application/vnd.adobe.adept+xml",
         "cbz" => "application/vnd.comicbook+zip",
         "cbr" => "application/vnd.comicbook-rar",
         "txt" => "text/plain",

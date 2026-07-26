@@ -72,6 +72,9 @@ pub struct Preferences {
     pub download_dir: Option<PathBuf>,
     #[serde(default = "default_preferred_formats")]
     pub preferred_formats: Vec<String>,
+    /// Opt-in embedded Libby (libbyapp.com) browser tab. Desktop only.
+    #[serde(default)]
+    pub libby_enabled: bool,
 }
 
 fn default_preferred_formats() -> Vec<String> {
@@ -90,6 +93,7 @@ impl Default for Preferences {
         Self {
             download_dir: None,
             preferred_formats: default_preferred_formats(),
+            libby_enabled: false,
         }
     }
 }

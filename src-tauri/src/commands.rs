@@ -382,6 +382,7 @@ fn mime_for_path(path: &std::path::Path) -> &'static str {
         Some("pdf") => "application/pdf",
         Some("mobi") => "application/x-mobipocket-ebook",
         Some("azw3") => "application/vnd.amazon.ebook",
+        Some("acsm") => "application/vnd.adobe.adept+xml",
         Some("cbz") => "application/vnd.comicbook+zip",
         Some("cbr") => "application/vnd.comicbook-rar",
         Some("txt") => "text/plain",
@@ -500,6 +501,21 @@ pub async fn set_download_dir(state: State<'_, AppState>, path: String) -> CmdRe
     {
         let mut cfg = state.config.write().await;
         cfg.preferences.download_dir = Some(PathBuf::from(path));
+    }
+    state.save().await.map_err(err)
+}
+
+#[tauri::command]
+pub async fn get_libby_enabled(state: State<'_, AppState>) -> CmdResult<bool> {
+    let cfg = state.config.read().await;
+    Ok(cfg.preferences.libby_enabled)
+}
+
+#[tauri::command]
+pub async fn set_libby_enabled(state: State<'_, AppState>, enabled: bool) -> CmdResult<()> {
+    {
+        let mut cfg = state.config.write().await;
+        cfg.preferences.libby_enabled = enabled;
     }
     state.save().await.map_err(err)
 }

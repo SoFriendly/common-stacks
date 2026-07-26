@@ -19,6 +19,7 @@ import {
 } from "../components/SendProgressModal";
 import { EmptyState } from "../components/EmptyState";
 import { tap } from "../lib/haptics";
+import { listen } from "@tauri-apps/api/event";
 
 type View = "grid" | "list";
 
@@ -50,7 +51,7 @@ export function Downloads() {
 
   async function refresh() {
     const files = await api.listDownloads();
-    setItems(files.map((file) => ({ file, inspecting: file.extension === "epub" })));
+    setItems(files.map((file) => ({ file, meta: loanMeta(file), inspecting: file.extension === "epub" })));
     // Inspect EPUBs in parallel; non-EPUBs stay as-is.
     files.forEach((file) => {
       if (file.extension !== "epub") return;
@@ -75,6 +76,12 @@ export function Downloads() {
 
   useEffect(() => {
     refresh();
+    // Files downloaded from the Libby tab land here without any action in
+    // this view — refresh so they appear as soon as the download completes.
+    const unlisten = listen("libby-download-finished", () => refresh());
+    return () => {
+      unlisten.then((fn) => fn());
+    };
   }, []);
 
   async function handleOpen(path: string) {
@@ -640,6 +647,20 @@ function friendlyError(raw: string, targetId?: string): string {
   return cleaned || raw;
 }
 
+// Files downloaded from the Libby tab carry loan metadata (title, author,
+// cover) captured from the Libby page — surface it through the same `meta`
+// slot EPUB inspection fills so cards and rows need no special casing.
+function loanMeta(file: DownloadedFile): EpubMetadata | undefined {
+  if (!file.loan_title) return undefined;
+  return {
+    title: file.loan_title,
+    authors: file.loan_author ? [file.loan_author] : [],
+    identifiers: [],
+    subjects: [],
+    cover_data_url: file.loan_cover_data_url,
+  };
+}
+
 const AUDIO_EXTS = new Set(["m4b", "mp3", "m4a", "aac", "opus", "ogg", "flac", "wav"]);
 
 function badgeForExtension(ext: string | undefined | null): string | null {
@@ -648,6 +669,7 @@ function badgeForExtension(ext: string | undefined | null): string | null {
   if (AUDIO_EXTS.has(e)) return "Audiobook";
   if (e === "pdf") return "PDF";
   if (e === "cbz" || e === "cbr") return "Comic";
+  if (e === "acsm") return "Loan";
   // EPUB and unknown formats render without a badge (epub is the default
   // assumption; unknown is noise).
   return null;

@@ -3,6 +3,7 @@ mod config;
 mod dedup;
 mod downloads;
 mod epub;
+mod libby;
 mod opds;
 mod plugins;
 mod state;
@@ -54,7 +55,12 @@ pub fn run() {
 
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_dialog::init());
+        .plugin(tauri_plugin_dialog::init())
+        // One-way reporting channel from the Libby webview's injected script
+        // (book context for downloads) — external pages get no Tauri IPC.
+        .register_uri_scheme_protocol("cs-libby", |ctx, request| {
+            libby::protocol_handler(ctx, request)
+        });
 
     #[cfg(not(any(target_os = "ios", target_os = "android")))]
     let builder = builder
@@ -106,6 +112,13 @@ pub fn run() {
             commands::set_send_target_enabled,
             commands::send_book,
             commands::fetch_kindle_relay_info,
+            commands::get_libby_enabled,
+            commands::set_libby_enabled,
+            libby::libby_show,
+            libby::libby_hide,
+            libby::libby_set_bounds,
+            libby::libby_back,
+            libby::libby_reload,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
