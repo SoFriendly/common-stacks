@@ -234,10 +234,16 @@
   // only stable thing in Libby's minified DOM is what the user reads.
   // ------------------------------------------------------------------
   var auto = { until: 0, step: 0, clicked: [] };
+  // The post-borrow path the user walks manually: Borrow -> (sometimes an
+  // "Open Book" / "Go To Shelf" bridge) -> "Read With..." -> "Other" ->
+  // "EPUB" -> a final download/confirm. Steps may be skipped when Libby
+  // jumps ahead, so any match at or after the current step advances.
   var AUTO_STEPS = [
+    /^(open book|go to shelf)$/i,
     /^read with\b/i,
-    /adobe|external reader|sideload|other (apps|readers)|epub/i,
-    /^(download|get)( the)?( epub| file)?!?$/i,
+    /^other\b|other (apps|options|readers)|external reader|adobe|sideload/i,
+    /\bepub\b/i,
+    /^(download|get|confirm|continue)\b/i,
   ];
 
   document.addEventListener(
@@ -260,6 +266,15 @@
           auto.clicked = [];
           var ctx = scrapeContext();
           if (ctx) report(ctx, true);
+        } else if (matchesStep(el, AUTO_STEPS[1])) {
+          // "Read With..." clicked by hand on an existing loan: same options
+          // screen as the borrow flow — pick up the automation from the
+          // "Other" step onward.
+          auto.until = Date.now() + 120000;
+          auto.step = 2;
+          auto.clicked = [el];
+          var ctx2 = scrapeContext();
+          if (ctx2) report(ctx2, true);
         }
       } catch (err) {}
     },
@@ -275,21 +290,56 @@
     return r.width > 0 && r.height > 0;
   }
 
+  // Short labels a control answers to: its full text when concise, plus its
+  // aria-label and any inner heading. Libby's fulfillment options bury the
+  // label (e.g. <h2>EPUB</h2>) under a long DRM explainer, so full-text
+  // matching alone misses them.
+  function labelsOf(el) {
+    var out = [];
+    var full = (el.textContent || "").trim();
+    if (full && full.length <= 40) out.push(full);
+    var aria = el.getAttribute("aria-label");
+    if (aria) out.push(aria.trim());
+    var heads = el.querySelectorAll("h1, h2, h3, h4");
+    for (var i = 0; i < heads.length; i++) {
+      var t = (heads[i].textContent || "").trim();
+      if (t && t.length <= 40) out.push(t);
+    }
+    return out;
+  }
+
+  function matchesStep(el, re) {
+    var labels = labelsOf(el);
+    for (var i = 0; i < labels.length; i++) {
+      if (re.test(labels[i])) return true;
+    }
+    return false;
+  }
+
   setInterval(function () {
     try {
       if (Date.now() > auto.until || auto.step >= AUTO_STEPS.length) return;
       var els = document.querySelectorAll('button, a, [role="button"]');
+      // Earliest-step match wins; matching any step at or beyond the current
+      // one advances past it (Libby skips steps depending on where the
+      // borrow happened).
+      var found = null;
+      var foundStep = AUTO_STEPS.length;
       for (var i = 0; i < els.length; i++) {
         var el = els[i];
         if (!visible(el) || auto.clicked.indexOf(el) !== -1) continue;
-        var txt = (el.textContent || "").trim();
-        if (txt.length > 40) continue;
-        if (AUTO_STEPS[auto.step].test(txt)) {
-          auto.clicked.push(el);
-          auto.step++;
-          el.click();
-          return; // one step per tick; let the UI settle
+        for (var s = auto.step; s < foundStep; s++) {
+          if (matchesStep(el, AUTO_STEPS[s])) {
+            found = el;
+            foundStep = s;
+            break;
+          }
         }
+      }
+      if (found) {
+        auto.clicked.push(found);
+        auto.step = foundStep + 1;
+        found.click(); // one step per tick; let the UI settle
       }
     } catch (e) {}
   }, 700);
