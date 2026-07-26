@@ -139,9 +139,19 @@ impl SendTarget for CrosspointTarget {
         let connect_host = if host.to_ascii_lowercase().ends_with(".local") {
             ctx.emit(SendProgress::stage(
                 "resolving",
-                format!("Resolving {} with mDNS…", host),
+                format!("Resolving {}…", host),
             ));
-            match resolve_mdns_ipv4(&host).await {
+            // Resolve via the OS first (Bonjour on macOS, the system resolver
+            // elsewhere): it's the only mDNS path macOS lets an app use — raw
+            // multicast is blocked by Local Network privacy — and it returns the
+            // A record fast. A direct query is a fallback for resolvers that
+            // don't do .local. Pinning `base` to the IP also avoids repeating
+            // the slow AAAA lookup on every request.
+            let resolved = match resolve_os_ipv4(&host, port).await {
+                Some(ip) => Some(ip),
+                None => resolve_mdns_ipv4(&host).await,
+            };
+            match resolved {
                 Some(ip) => {
                     ctx.emit(SendProgress::stage(
                         "resolved",
@@ -459,6 +469,22 @@ fn fmt_size(n: usize) -> String {
     } else {
         format!("{:.2} GB", n / 1024.0 / 1024.0 / 1024.0)
     }
+}
+
+/// Resolve `host` to an IPv4 via the OS resolver (Bonjour on macOS,
+/// systemd-resolved/avahi on Linux, the system resolver on Windows). This is the
+/// mDNS path macOS permits from an app — raw multicast is blocked by Local
+/// Network privacy — and it returns the A record quickly. IPv4-only so the base
+/// URL pins to the device IP and we skip the slow AAAA lookup on later requests.
+async fn resolve_os_ipv4(host: &str, port: u16) -> Option<Ipv4Addr> {
+    let target = format!("{}:{}", host, port);
+    let addrs = tokio::net::lookup_host(target).await.ok()?;
+    for addr in addrs {
+        if let std::net::IpAddr::V4(v4) = addr.ip() {
+            return Some(v4);
+        }
+    }
+    None
 }
 
 async fn resolve_mdns_ipv4(host: &str) -> Option<Ipv4Addr> {

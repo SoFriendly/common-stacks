@@ -14,10 +14,27 @@ import org.json.JSONObject
 import java.io.File
 
 class MainActivity : TauriActivity() {
+  // Android drops incoming multicast packets unless the app holds a
+  // MulticastLock — without it the Rust-side mDNS resolver never hears the
+  // Crosspoint's reply and `crosspoint.local` fails to resolve.
+  private var multicastLock: android.net.wifi.WifiManager.MulticastLock? = null
+
   override fun onCreate(savedInstanceState: Bundle?) {
     setTheme(R.style.Theme_common_stacks_Base)
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
+    val wifi =
+      applicationContext.getSystemService(WIFI_SERVICE) as android.net.wifi.WifiManager
+    multicastLock = wifi.createMulticastLock("cs-mdns").apply {
+      setReferenceCounted(false)
+      acquire()
+    }
+  }
+
+  override fun onDestroy() {
+    multicastLock?.release()
+    multicastLock = null
+    super.onDestroy()
   }
 
   // Libby bridge. The /libby route embeds libbyapp.com in an iframe; the

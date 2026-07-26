@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- macOS 15+ Local Network Privacy: required so the app may connect to
+       devices on the LAN (e.g. a CrossPoint Reader). Without this key the OS
+       denies local connections with EHOSTUNREACH and never shows a prompt. -->
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Common Stacks connects to e-readers on your local network to send books.</string>
+  <!-- Bonjour service types the app resolves (crosspoint.local advertises HTTP).
+       Lets the system mDNS resolver answer .local lookups for this app. -->
+  <key>NSBonjourServices</key>
+  <array>
+    <string>_http._tcp</string>
+  </array>
+</dict>
+</plist>
