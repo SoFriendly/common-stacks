@@ -1,13 +1,19 @@
 //! Embedded Libby (libbyapp.com) browser tab.
 //!
-//! The Libby view is a native child webview overlaid on the main window at
-//! bounds the frontend reports (the `/libby` route renders a placeholder div
-//! and mirrors its rect here). A child webview — not an iframe — because both
-//! halves of the feature depend on native hooks: the initialization script
-//! injects our CSS into Libby's page context on every navigation, and the
-//! download handler routes `.acsm`/ebook files into the Common Stacks
-//! download shelf. Desktop only: Tauri's multi-webview API doesn't exist on
-//! iOS/Android.
+//! Desktop: a native child webview overlaid on the main window at bounds the
+//! frontend reports (the `/libby` route renders a placeholder div and mirrors
+//! its rect here). The initialization script injects our CSS into Libby's
+//! page context on every navigation, and wry's download handler routes
+//! `.acsm`/ebook files into the Common Stacks download shelf.
+//!
+//! Android: the `/libby` route embeds libbyapp.com in an iframe inside the
+//! main webview. The same injection script reaches the cross-origin iframe
+//! because wry registers initialization scripts via
+//! `addDocumentStartJavaScript` with origin `*` (we add it app-wide as a
+//! plugin script, guarded by hostname). Book context and download requests
+//! travel over a `WebMessageListener` bridge set up in MainActivity.kt,
+//! forwarded through the React app into `libby_report_context` /
+//! `libby_android_download`.
 
 use serde::{Deserialize, Serialize};
 
@@ -200,7 +206,7 @@ mod desktop {
                             let dest = destination.clone();
                             let app = webview.app_handle().clone();
                             tauri::async_runtime::spawn(async move {
-                                match write_loan_sidecar(&dest, &b).await {
+                                match super::write_loan_sidecar(&dest, &b).await {
                                     Ok(()) => {
                                         let _ = app.emit(
                                             "libby-download-finished",
@@ -267,13 +273,16 @@ mod desktop {
         rx.recv_timeout(Duration::from_secs(5))
             .map_err(|_| "timed out creating the Libby view".to_string())?
     }
+}
 
-    /// Download the cover image and write the loan metadata sidecar that the
-    /// download shelf reads (see `downloads::read_loan_meta`).
-    async fn write_loan_sidecar(
-        path: &std::path::Path,
-        book: &super::LibbyContext,
-    ) -> anyhow::Result<()> {
+/// Download the cover image and write the loan metadata sidecar that the
+/// download shelf reads (see `downloads::read_loan_meta`). Shared by the
+/// desktop download hook and the Android download command.
+pub(crate) async fn write_loan_sidecar(
+    path: &std::path::Path,
+    book: &LibbyContext,
+) -> anyhow::Result<()> {
+    use std::time::Duration;
         let mut cover_file: Option<String> = None;
         let mut cover_mime: Option<String> = None;
         let stem = path
@@ -325,7 +334,6 @@ mod desktop {
             serde_json::to_vec_pretty(&json)?,
         )?;
         Ok(())
-    }
 }
 
 #[cfg(not(any(target_os = "ios", target_os = "android")))]
@@ -395,4 +403,132 @@ pub fn libby_back(app: tauri::AppHandle) -> CmdResult<()> {
 #[tauri::command]
 pub fn libby_reload(app: tauri::AppHandle) -> CmdResult<()> {
     commands_impl::reload(&app)
+}
+
+/// Android: book context relayed from the iframe's injected script via the
+/// MainActivity WebMessageListener bridge and the React app.
+#[tauri::command]
+pub async fn libby_report_context(
+    state: tauri::State<'_, crate::state::AppState>,
+    context: LibbyContext,
+) -> CmdResult<()> {
+    tracing::info!("libby context (bridge): {:?}", context);
+    let slot = state.libby_context.lock();
+    if let Ok(mut slot) = slot {
+        *slot = Some(context);
+    }
+    Ok(())
+}
+
+/// Android: a download initiated inside the Libby iframe, captured by the
+/// WebView DownloadListener in MainActivity. The WebView can't write files
+/// itself, so we re-fetch the URL with the session cookies and route the
+/// bytes through the regular shelf pipeline (naming, sidecar, event).
+#[derive(Debug, Deserialize)]
+pub struct AndroidDownloadRequest {
+    pub url: String,
+    #[serde(default)]
+    pub cookie: String,
+    #[serde(default)]
+    pub user_agent: String,
+    #[serde(default)]
+    pub mime: String,
+    #[serde(default)]
+    pub disposition: String,
+}
+
+#[tauri::command]
+pub async fn libby_android_download(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, crate::state::AppState>,
+    request: AndroidDownloadRequest,
+) -> CmdResult<serde_json::Value> {
+    use tauri::Emitter;
+
+    let book = state.libby_context.lock().ok().and_then(|g| g.clone());
+
+    let mut client = crate::tls::client_builder()
+        .timeout(std::time::Duration::from_secs(120));
+    client = if request.user_agent.is_empty() {
+        client.user_agent("Common Stacks/0.1")
+    } else {
+        client.user_agent(&request.user_agent)
+    };
+    let client = client.build().map_err(|e| e.to_string())?;
+
+    let mut req = client.get(&request.url);
+    if !request.cookie.is_empty() {
+        req = req.header("Cookie", request.cookie.clone());
+    }
+    let resp = req.send().await.map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("download failed: HTTP {}", resp.status()));
+    }
+    let content_type = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+
+    let ext = filename_from_disposition(&request.disposition)
+        .and_then(|n| {
+            n.rsplit('.')
+                .next()
+                .map(|s| s.to_ascii_lowercase())
+                .filter(|e| {
+                    !e.is_empty() && e.len() <= 5 && e.chars().all(|c| c.is_ascii_alphanumeric())
+                })
+        })
+        .or_else(|| crate::downloads::ext_from_mime(&request.mime).map(String::from))
+        .or_else(|| {
+            content_type
+                .as_deref()
+                .and_then(crate::downloads::ext_from_mime)
+                .map(String::from)
+        })
+        .unwrap_or_else(|| "acsm".into());
+
+    let filename = match &book {
+        Some(b) => crate::downloads::build_filename(&b.title, b.author.as_deref(), &ext),
+        None => filename_from_disposition(&request.disposition)
+            .map(|n| sanitize_filename::sanitize(&n))
+            .unwrap_or_else(|| format!("libby-download.{}", ext)),
+    };
+    let dir = {
+        let cfg = state.config.read().await;
+        crate::config::resolved_download_dir(&cfg)
+    };
+    let path = crate::downloads::write_file(&dir, &filename, &bytes).map_err(|e| e.to_string())?;
+    tracing::info!("libby android download -> {}", path.display());
+
+    if let Some(b) = &book {
+        if let Err(e) = write_loan_sidecar(&path, b).await {
+            tracing::warn!("libby sidecar failed: {}", e);
+        }
+    }
+
+    let payload = serde_json::json!({
+        "path": path,
+        "success": true,
+        "title": book.as_ref().map(|b| b.title.clone()),
+        "cover": book.as_ref().and_then(|b| b.cover.clone()),
+    });
+    let _ = app.emit("libby-download-finished", payload.clone());
+    Ok(payload)
+}
+
+/// Pull the filename out of a Content-Disposition header
+/// (`attachment; filename="URLLink.acsm"`).
+fn filename_from_disposition(disposition: &str) -> Option<String> {
+    let lower = disposition.to_ascii_lowercase();
+    let idx = lower.find("filename=")?;
+    let rest = disposition[idx + "filename=".len()..].trim_start_matches(['"', '\'']);
+    let end = rest.find(['"', '\'', ';']).unwrap_or(rest.len());
+    let name = rest[..end].trim();
+    if name.is_empty() {
+        None
+    } else {
+        Some(name.to_string())
+    }
 }

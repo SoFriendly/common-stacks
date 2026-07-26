@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router";
 import {
+  BookOpen as BookOpenIcon,
   Download as DownloadIcon,
   Library as LibraryIcon,
   Settings as SettingsIcon,
@@ -7,6 +8,7 @@ import {
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { tap } from "../lib/haptics";
+import { useLibbyEnabled } from "../lib/libbyPref";
 
 interface TabItem {
   to: string;
@@ -14,7 +16,7 @@ interface TabItem {
   Icon: LucideIcon;
 }
 
-const items: TabItem[] = [
+const baseItems: TabItem[] = [
   { to: "/library", label: "Library", Icon: LibraryIcon },
   { to: "/downloads", label: "Downloads", Icon: DownloadIcon },
   { to: "/settings", label: "Settings", Icon: SettingsIcon },
@@ -22,10 +24,23 @@ const items: TabItem[] = [
 
 export function MobileTabBar() {
   const { pathname } = useLocation();
+  const libbyEnabled = useLibbyEnabled();
+  const items = libbyEnabled
+    ? [
+        baseItems[0],
+        { to: "/libby", label: "Libby", Icon: BookOpenIcon },
+        ...baseItems.slice(1),
+      ]
+    : baseItems;
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-shelf/70 bg-paper/96 px-2 pt-1.5 pb-[calc(0.45rem+env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(26,24,20,0.06)] backdrop-blur-xl">
-      <div className="mx-auto grid max-w-md grid-cols-3">
+      <div
+        className={cn(
+          "mx-auto grid max-w-md",
+          items.length === 4 ? "grid-cols-4" : "grid-cols-3",
+        )}
+      >
         {items.map(({ to, label, Icon }) => {
           const isActive = isTabActive(pathname, to);
           return (

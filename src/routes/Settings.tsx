@@ -171,7 +171,7 @@ export function Settings() {
               onSaved={refresh}
             />
           ))}
-          {!isMobile && <LibbyRow />}
+          {(!isMobile || isAndroid) && <LibbyRow />}
         </div>
       </SettingsRow>
 

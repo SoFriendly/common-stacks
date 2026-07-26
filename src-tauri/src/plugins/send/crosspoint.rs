@@ -218,6 +218,11 @@ impl SendTarget for CrosspointTarget {
             .next()
             .map(|s| s.eq_ignore_ascii_case("epub"))
             .unwrap_or(false);
+        let is_acsm = filename
+            .rsplit('.')
+            .next()
+            .map(|s| s.eq_ignore_ascii_case("acsm"))
+            .unwrap_or(false);
         if optimize_enabled && is_epub {
             let quality: u8 = settings
                 .fields
@@ -287,19 +292,158 @@ impl SendTarget for CrosspointTarget {
         ));
         let resp = client.post(&upload_url).multipart(form).send().await?;
         let status = resp.status();
-        if status.is_success() {
-            Ok(SendResult {
-                ok: true,
-                message: format!("uploaded {} to {}{}", filename, host, folder),
-            })
-        } else {
+        if !status.is_success() {
             let body = resp.text().await.unwrap_or_default();
-            Err(anyhow!(
+            return Err(anyhow!(
                 "Crosspoint upload to {} returned {}: {}",
                 upload_url,
                 status,
                 body
-            ))
+            ));
+        }
+        let body = resp.text().await.unwrap_or_default();
+
+        // For a library loan the firmware auto-starts fulfillment when the .acsm
+        // lands (device activated + on Wi-Fi). Its /upload reply says so; we then
+        // poll /api/adept/status and stream a distinct message per step, mirroring
+        // the device's web UI (verify loan → download → save → done).
+        if is_acsm {
+            if !body.contains("loan fulfillment started") {
+                return Err(anyhow!(
+                    "Uploaded the .acsm, but the Crosspoint didn't start fulfillment. \
+                     Sign the device in first (Web Settings → Adobe / ByteBooks ID) and \
+                     connect it to Wi-Fi (not its own hotspot), then send again."
+                ));
+            }
+            ctx.emit(SendProgress::stage(
+                "fulfilling",
+                "Fulfilling library loan…",
+            ));
+            let title = poll_fulfillment(&client, &base, ctx).await?;
+            let label = if title.trim().is_empty() {
+                filename.clone()
+            } else {
+                title
+            };
+            return Ok(SendResult {
+                ok: true,
+                message: format!("fulfilled {} on {}", label, host),
+            });
+        }
+
+        Ok(SendResult {
+            ok: true,
+            message: format!("uploaded {} to {}{}", filename, host, folder),
+        })
+    }
+}
+
+/// `/api/adept/status` payload (only the fields we track).
+#[derive(Deserialize, Default)]
+struct AdeptStatus {
+    #[serde(default)]
+    task: AdeptTask,
+}
+
+#[derive(Deserialize, Default)]
+struct AdeptTask {
+    #[serde(default)]
+    state: u8, // 0 Idle, 1 Working, 2 Ok, 3 Error
+    #[serde(default)]
+    operation: String,
+    #[serde(default)]
+    message: String,
+    #[serde(default)]
+    step: u8,
+    #[serde(default)]
+    completed: u64,
+}
+
+/// A friendly, per-step progress event mirroring the firmware fulfillment task
+/// (AdeptSupport::fulfillmentTask): step 0 verify, 1 download, 2 save.
+fn fulfillment_progress(task: &AdeptTask) -> SendProgress {
+    match task.step {
+        0 => SendProgress::stage("fulfill_verify", "Verifying library loan…"),
+        1 => {
+            if task.completed > 0 {
+                SendProgress::stage(
+                    "fulfill_download",
+                    format!("Downloading book… ({})", fmt_size(task.completed as usize)),
+                )
+            } else {
+                SendProgress::stage("fulfill_download", "Downloading book…")
+            }
+        }
+        2 => SendProgress::stage("fulfill_save", "Saving book to device…"),
+        _ => SendProgress::stage(
+            "fulfill_working",
+            if task.message.is_empty() {
+                "Fulfilling loan…".to_string()
+            } else {
+                task.message.clone()
+            },
+        ),
+    }
+}
+
+/// Poll `/api/adept/status` until the device's background fulfillment finishes,
+/// streaming a distinct message per step. Returns the fulfilled book title.
+async fn poll_fulfillment(
+    client: &reqwest::Client,
+    base: &str,
+    ctx: &SendContext,
+) -> Result<String> {
+    let status_url = format!("{}/api/adept/status", base);
+    let start = std::time::Instant::now();
+    let overall_deadline = Duration::from_secs(600);
+    // Ignore a terminal state seen before any Working — it's a stale result from
+    // a previous send, not this one.
+    let terminal_grace = Duration::from_secs(2);
+    let mut seen_working = false;
+
+    loop {
+        if start.elapsed() > overall_deadline {
+            return Err(anyhow!("Timed out waiting for the loan to fulfill."));
+        }
+        tokio::time::sleep(Duration::from_millis(800)).await;
+
+        let status: AdeptStatus = match client.get(&status_url).send().await {
+            Ok(resp) if resp.status().is_success() => match resp.json().await {
+                Ok(s) => s,
+                Err(_) => continue, // transient parse issue; keep polling
+            },
+            _ => continue, // transient network issue; keep polling
+        };
+
+        let task = status.task;
+        if task.operation != "fulfillment" {
+            continue; // task hasn't reported fulfillment yet
+        }
+
+        match task.state {
+            1 => {
+                seen_working = true;
+                ctx.emit(fulfillment_progress(&task));
+            }
+            2 => {
+                if !seen_working && start.elapsed() < terminal_grace {
+                    continue;
+                }
+                ctx.emit(SendProgress::stage("fulfill_done", "Loan fulfilled"));
+                return Ok(task.message);
+            }
+            3 => {
+                if !seen_working && start.elapsed() < terminal_grace {
+                    continue;
+                }
+                let detail = if task.message.is_empty() {
+                    "unknown error".to_string()
+                } else {
+                    task.message
+                };
+                return Err(anyhow!("Loan fulfillment failed: {}", detail));
+            }
+            _ => {} // Idle — keep waiting
         }
     }
 }

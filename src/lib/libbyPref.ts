@@ -1,18 +1,18 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
-import { isMobile } from "./platform";
+import { isAndroid, isMobile } from "./platform";
 
 // The Libby tab preference lives in the Rust config; this module caches it and
 // broadcasts changes so the nav components and Settings stay in sync without a
-// provider. The tab is desktop-only — Tauri's multi-webview API doesn't exist
-// on iOS/Android — so mobile always reads false.
+// provider. Desktop uses a native child webview, Android an iframe with a
+// native bridge; iOS has neither, so it always reads false there.
 
 const CHANGE_EVENT = "cs-libby-enabled-changed";
 
 let cached: boolean | null = null;
 
 async function fetchEnabled(): Promise<boolean> {
-  if (isMobile) return false;
+  if (isMobile && !isAndroid) return false;
   if (cached === null) {
     try {
       cached = await api.getLibbyEnabled();

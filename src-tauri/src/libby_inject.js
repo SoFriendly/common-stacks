@@ -11,6 +11,11 @@
 // Keep the palette in sync with @theme in src/styles.css.
 (function () {
   if (window.__csLibby) return;
+  // On Android this script is registered app-wide (it must be, to reach the
+  // cross-origin iframe), so it also runs in the Common Stacks React app and
+  // any other frame — bail everywhere except Libby itself.
+  var host = (location.hostname || "").toLowerCase();
+  if (host !== "libbyapp.com" && !/\.libbyapp\.com$/.test(host)) return;
   window.__csLibby = true;
 
   // Force Libby's auto lighting to "light" regardless of the OS appearance:
@@ -156,7 +161,15 @@
       var s = JSON.stringify(ctx);
       if (!force && s === lastReport) return;
       lastReport = s;
-      window.location.href = "cs-libby://ctx?d=" + encodeURIComponent(s);
+      if (window.csLibbyBridge && window.csLibbyBridge.postMessage) {
+        // Android: WebMessageListener bridge installed by MainActivity,
+        // scoped to libbyapp.com frames.
+        window.csLibbyBridge.postMessage(
+          JSON.stringify({ kind: "context", data: ctx })
+        );
+      } else {
+        window.location.href = "cs-libby://ctx?d=" + encodeURIComponent(s);
+      }
     } catch (e) {}
   }
 
@@ -167,12 +180,12 @@
     return m ? m[1] : "";
   }
 
-  function scrapeContext() {
-    // The dominant OverDrive CDN cover on screen is the active book. Covers
-    // appear as <img> (alt text = title) or as inline background-image divs.
-    // Class-name selectors are a last resort — Libby minifies and shuffles
-    // them.
-    var els = document.querySelectorAll('img, [style*="od-cdn"]');
+  // Scrape the book context within `root`. Covers appear as <img> (alt text
+  // = title) or as inline background-image divs; the biggest od-cdn cover in
+  // scope is the book. Class-name selectors are a last resort — Libby
+  // minifies and shuffles them.
+  function scrapeFrom(root, minArea) {
+    var els = root.querySelectorAll('img, [style*="od-cdn"]');
     var best = null;
     var bestArea = 0;
     for (var i = 0; i < els.length; i++) {
@@ -185,24 +198,42 @@
         best = els[i];
       }
     }
-    if (!best || bestArea < 2000) return null;
+    if (!best || bestArea < minArea) return null;
     var title = cleanTitle(
       best.getAttribute("alt") || best.getAttribute("aria-label") || ""
     );
     if (!title) {
-      var h = document.querySelector('h1, h2, [class*="title-name"]');
+      var h = root.querySelector('h1, h2, [class*="title-name"]');
       if (h) title = cleanTitle((h.textContent || "").trim());
     }
     if (!title) return null;
+    var authorSel =
+      'a[href*="creator"], [class*="byline"], [class*="title-author"], [class*="author-name"], [class*="creator"]';
+    var authorEl = root.querySelector(authorSel) || document.querySelector(authorSel);
     var author = null;
-    var authorEl = document.querySelector(
-      'a[href*="creator"], [class*="byline"], [class*="title-author"], [class*="author-name"], [class*="creator"]'
-    );
     if (authorEl) {
       author =
         (authorEl.textContent || "").replace(/^by\s+/i, "").trim() || null;
     }
     return { title: title, author: author, cover: coverUrlOf(best) };
+  }
+
+  function scrapeContext() {
+    return scrapeFrom(document, 2000);
+  }
+
+  // Scrape the book the user actually acted on: climb from the clicked
+  // control to the nearest ancestor containing a cover (its loan card /
+  // title panel). A shelf shows many covers — the dominant one on screen is
+  // often a different book entirely.
+  function scrapeNear(el) {
+    var node = el;
+    for (var depth = 0; node && node !== document.body && depth < 12; depth++) {
+      var ctx = scrapeFrom(node, 400);
+      if (ctx) return ctx;
+      node = node.parentElement;
+    }
+    return scrapeContext();
   }
 
   // Libby cover alt text reads like `Book: 'Yesteryear'. Cover image.` —
@@ -222,6 +253,10 @@
 
   setInterval(function () {
     try {
+      // While an export is in flight the click-time capture is authoritative
+      // — don't let the dominant-cover heuristic clobber it with whichever
+      // book happens to be biggest on screen.
+      if (Date.now() < auto.until) return;
       var ctx = scrapeContext();
       if (ctx) report(ctx, false);
     } catch (e) {}
@@ -264,16 +299,17 @@
           auto.until = Date.now() + 120000;
           auto.step = 0;
           auto.clicked = [];
-          var ctx = scrapeContext();
+          var ctx = scrapeNear(el);
           if (ctx) report(ctx, true);
         } else if (matchesStep(el, AUTO_STEPS[1])) {
           // "Read With..." clicked by hand on an existing loan: same options
           // screen as the borrow flow — pick up the automation from the
-          // "Other" step onward.
+          // "Other" step onward. Scrape from the clicked card, not the whole
+          // page — a shelf shows every loan's cover.
           auto.until = Date.now() + 120000;
           auto.step = 2;
           auto.clicked = [el];
-          var ctx2 = scrapeContext();
+          var ctx2 = scrapeNear(el);
           if (ctx2) report(ctx2, true);
         }
       } catch (err) {}

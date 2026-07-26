@@ -67,6 +67,17 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init());
 
+    // Android renders Libby in an iframe inside the main webview; wry
+    // registers plugin init scripts via addDocumentStartJavaScript with
+    // origin "*", which is what carries the script into the cross-origin
+    // iframe. The script no-ops everywhere but libbyapp.com (hostname guard).
+    #[cfg(target_os = "android")]
+    let builder = builder.plugin(
+        tauri::plugin::Builder::<tauri::Wry>::new("cs-libby-inject")
+            .js_init_script_on_all_frames(include_str!("libby_inject.js").to_string())
+            .build(),
+    );
+
     builder
         .setup(|app| {
             config::init_paths(&app.handle())?;
@@ -119,6 +130,8 @@ pub fn run() {
             libby::libby_set_bounds,
             libby::libby_back,
             libby::libby_reload,
+            libby::libby_report_context,
+            libby::libby_android_download,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

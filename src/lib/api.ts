@@ -189,6 +189,27 @@ export interface LibbyBounds {
   height: number;
 }
 
+export interface LibbyContext {
+  title: string;
+  author?: string | null;
+  cover?: string | null;
+}
+
+export interface LibbyAndroidDownloadRequest {
+  url: string;
+  cookie?: string;
+  user_agent?: string;
+  mime?: string;
+  disposition?: string;
+}
+
+export interface LibbyDownloadResult {
+  path: string;
+  success: boolean;
+  title?: string | null;
+  cover?: string | null;
+}
+
 export interface AppVersionInfo {
   version: string;
   android_version_code?: number | null;
@@ -246,6 +267,10 @@ export const api = {
   libbySetBounds: (bounds: LibbyBounds) => invoke<void>("libby_set_bounds", { bounds }),
   libbyBack: () => invoke<void>("libby_back"),
   libbyReload: () => invoke<void>("libby_reload"),
+  libbyReportContext: (context: LibbyContext) =>
+    invoke<void>("libby_report_context", { context }),
+  libbyAndroidDownload: (request: LibbyAndroidDownloadRequest) =>
+    invoke<LibbyDownloadResult>("libby_android_download", { request }),
 
   listPlugins: () => invoke<InstalledPlugin[]>("list_plugins"),
   pluginsDir: () => invoke<string>("plugins_dir"),

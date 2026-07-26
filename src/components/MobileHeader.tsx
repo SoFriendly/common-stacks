@@ -108,6 +108,7 @@ export function MobileHeader() {
 
 function titleForPath(pathname: string, params: URLSearchParams): string {
   if (pathname.startsWith("/downloads")) return "Downloads";
+  if (pathname.startsWith("/libby")) return "Libby";
   if (pathname.startsWith("/settings")) return "Settings";
   if (pathname.startsWith("/book")) return "Book";
   if (pathname.startsWith("/browse")) return params.get("title") || "Browse";
