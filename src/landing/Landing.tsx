@@ -3,6 +3,7 @@ import { CoverCard } from "../components/CoverCard";
 import { Rail } from "../components/Rail";
 import { DefaultCover } from "../components/DefaultCover";
 import { data, type LandingEntry } from "./data";
+import { BookDescription } from "../lib/BookDescription";
 import {
   Search as SearchIcon,
   Settings as SettingsIcon,
@@ -626,9 +627,10 @@ function BookPreview({
             </div>
           )}
           {entry.summary && (
-            <p className="mt-6 max-w-2xl text-base leading-relaxed text-ink/90">
-              {entry.summary}
-            </p>
+            <BookDescription
+              html={entry.summary}
+              className="mt-6 max-w-2xl text-base leading-relaxed text-ink/90"
+            />
           )}
           {entry.isbn && !entry.isbn.startsWith("MB") && (
             <p className="mt-6 text-xs text-ink-soft">ISBN {entry.isbn}</p>

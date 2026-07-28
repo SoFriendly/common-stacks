@@ -5,6 +5,7 @@ import { DefaultCover } from "../components/DefaultCover";
 import { set as cacheEnrichment, applyToEntry, get as getCachedEnrichment, ensureLoaded as ensureEnrichmentLoaded } from "../lib/enrichment";
 import { classifyAcquisition, entryFormats, formatLabel as formatKindLabel } from "../lib/format";
 import { useIsMobile } from "../lib/platform";
+import { BookDescription } from "../lib/BookDescription";
 
 /** State passed via navigation when clicking a cover. */
 export interface BookNavState {
@@ -483,7 +484,7 @@ export function Book() {
           {entry.summary && (
             <div className="mt-10">
               <h2 className="mb-2 font-display text-lg">About</h2>
-              <p className="leading-relaxed text-ink-soft">{entry.summary}</p>
+              <BookDescription html={entry.summary} className="leading-relaxed text-ink-soft" />
             </div>
           )}
 
