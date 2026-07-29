@@ -192,14 +192,38 @@ elif [ -n "$WIN_MSI_SIG" ]; then
   add_platform "windows-x86_64" "$WIN_MSI_SIG" "${PUBLIC_BASE}/v${VERSION}/${APP}_${VERSION}_x64-setup.msi"
 fi
 
-if [ -n "$MAC_SIG" ]; then
+DESKTOP_PLATFORMS='[
+  "darwin-aarch64",
+  "darwin-x86_64",
+  "windows-x86_64",
+  "linux-x86_64",
+  "linux-aarch64"
+]'
+
+# latest.json has one shared version for every Tauri target. Only advance it
+# after every desktop entry points at an artifact for that version; otherwise
+# a stale target repeatedly installs its older artifact while being told the
+# newer shared version is still available.
+if jq -e \
+  --arg ver "$VERSION" \
+  --arg app "$APP" \
+  --argjson platforms "$DESKTOP_PLATFORMS" '
+    . as $manifest
+    | all(
+      $platforms[];
+      . as $platform
+      | (($manifest.platforms[$platform].url? // "") | contains("/v" + $ver + "/"))
+      and
+      (($manifest.platforms[$platform].url? // "") | contains($app + "_" + $ver + "_"))
+    )
+  ' "$LATEST" >/dev/null; then
   jq --arg ver "$VERSION" --arg notes "$NOTES" --arg pub_date "$PUB_DATE" '
     .version = $ver
     | .notes = $notes
     | .pub_date = $pub_date
   ' "$LATEST" > "${LATEST}.tmp" && mv "${LATEST}.tmp" "$LATEST"
 elif [ "$TAURI_UPDATED" = "1" ]; then
-  echo "Preserving existing Tauri manifest version because no macOS updater artifact was uploaded"
+  echo "Preserving existing Tauri manifest version until every desktop artifact is v$VERSION"
 fi
 
 if [ "$UPDATED" = "1" ]; then

@@ -97,8 +97,19 @@ without publishing a desktop update.
 Desktop releases still use the Tauri updater flow:
 
 ```bash
+# On macOS: bump, build, upload, tag, and start the Linux CI build.
 bun run release:macos -- patch
 ```
+
+Then pull the release on the signed Windows machine and publish the matching
+Windows artifact:
+
+```powershell
+.\scripts\build-windows.ps1 --no-bump -Upload
+```
+
+The shared desktop updater version advances only after the macOS, Linux, and
+Windows artifact URLs all reference that version.
 
 ### Tip: app file locations
 

@@ -150,15 +150,40 @@ foreach ($platform in $unsignedPlatforms) {
     $latest.platforms.PSObject.Properties.Remove($platform)
 }
 
-$latest | Add-Member -NotePropertyName version  -NotePropertyValue $VERSION -Force
-$latest | Add-Member -NotePropertyName notes    -NotePropertyValue $NOTES -Force
-$latest | Add-Member -NotePropertyName pub_date -NotePropertyValue ((Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")) -Force
-
 $winEntry = [PSCustomObject]@{
     signature = $winSig
     url       = $winUrl
 }
 $latest.platforms | Add-Member -NotePropertyName "windows-x86_64" -NotePropertyValue $winEntry -Force
+
+# latest.json has one shared version for every Tauri target. Only advance it
+# after every desktop entry points at an artifact for that version; otherwise
+# a stale target repeatedly installs its older artifact while being told the
+# newer shared version is still available.
+$desktopPlatforms = @(
+    "darwin-aarch64",
+    "darwin-x86_64",
+    "windows-x86_64",
+    "linux-x86_64",
+    "linux-aarch64"
+)
+$desktopReady = $true
+foreach ($platform in $desktopPlatforms) {
+    $property = $latest.platforms.PSObject.Properties[$platform]
+    $url = if ($property) { [string]$property.Value.url } else { "" }
+    if ($url -notlike "*/v$VERSION/${APP}_${VERSION}_*") {
+        $desktopReady = $false
+        break
+    }
+}
+
+if ($desktopReady) {
+    $latest | Add-Member -NotePropertyName version  -NotePropertyValue $VERSION -Force
+    $latest | Add-Member -NotePropertyName notes    -NotePropertyValue $NOTES -Force
+    $latest | Add-Member -NotePropertyName pub_date -NotePropertyValue ((Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")) -Force
+} else {
+    Write-Warning "Preserving existing Tauri manifest version until every desktop artifact is v$VERSION"
+}
 
 $json = $latest | ConvertTo-Json -Depth 10
 [System.IO.File]::WriteAllText($latestJsonPath, $json, [System.Text.UTF8Encoding]::new($false))

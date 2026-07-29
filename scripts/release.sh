@@ -4,7 +4,8 @@ set -e
 # Usage: ./scripts/release.sh [major|minor|patch|<version>]
 # Convenience wrapper: bump + build + commit + tag + push + upload, in that order.
 # Equivalent to: ./scripts/build-macos.sh <bump> --upload
-# (Linux/Windows builds run in CI once the tag is pushed.)
+# (Linux builds run in CI once the tag is pushed. Windows is built separately
+# on the signed Windows machine.)
 
 BUMP=${1:?Usage: ./scripts/release.sh [major|minor|patch|<version>]}
 
@@ -27,7 +28,11 @@ VERSION=$(grep '"version"' src-tauri/tauri.conf.json | head -1 | sed 's/.*"versi
 cat <<EOF
 
 === Release v$VERSION pushed ===
-macOS uploaded. GitHub Actions is building Linux/Windows.
-Once CI finishes, the publish job uploads those artifacts and merges them into
-latest.json for the Tauri updater.
+macOS uploaded. GitHub Actions is building Linux.
+Build and upload Windows v$VERSION from the signed Windows machine:
+
+  .\scripts\build-windows.ps1 --no-bump -Upload
+
+latest.json will advertise v$VERSION only after macOS, Linux, and Windows
+updater artifacts all point to that version.
 EOF
