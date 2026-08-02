@@ -7,8 +7,11 @@ use url::Url;
 
 pub fn parse(bytes: &[u8], base_url: &str) -> Result<Feed> {
     let base = Url::parse(base_url).ok();
+    // Don't trim at the event level: entity references split text into
+    // multiple Text events, and per-fragment trimming eats the whitespace
+    // around them ("Tom &amp; Jerry" → "Tom&Jerry"). Consumers trim the
+    // assembled buffer instead.
     let mut reader = Reader::from_reader(bytes);
-    reader.config_mut().trim_text(true);
 
     let mut feed = Feed::default();
     let mut depth: i32 = 0;
@@ -86,6 +89,31 @@ pub fn parse(bytes: &[u8], base_url: &str) -> Result<Feed> {
                     text_buf.push_str(&String::from_utf8_lossy(t.as_ref()));
                 }
             }
+            // quick-xml emits entity/char references (&amp; &#39; ...) as
+            // separate events rather than expanding them into Text — without
+            // this arm they'd be silently dropped from titles and summaries.
+            Event::GeneralRef(r) => {
+                if capture_text {
+                    if let Ok(Some(ch)) = r.resolve_char_ref() {
+                        text_buf.push(ch);
+                    } else if let Ok(name) = r.decode() {
+                        match name.as_ref() {
+                            "amp" => text_buf.push('&'),
+                            "lt" => text_buf.push('<'),
+                            "gt" => text_buf.push('>'),
+                            "quot" => text_buf.push('"'),
+                            "apos" => text_buf.push('\''),
+                            // Unknown entity: keep it verbatim so HTML-typed
+                            // summaries can still decode it in the webview.
+                            other => {
+                                text_buf.push('&');
+                                text_buf.push_str(other);
+                                text_buf.push(';');
+                            }
+                        }
+                    }
+                }
+            }
             Event::End(e) => {
                 let name = local_name(e.name());
                 let in_entry = entry_depth.is_some();
@@ -145,8 +173,8 @@ pub fn parse(bytes: &[u8], base_url: &str) -> Result<Feed> {
                     }
                 } else {
                     match name.as_str() {
-                        "title" => feed.title = std::mem::take(&mut text_buf),
-                        "id" => feed.id = std::mem::take(&mut text_buf),
+                        "title" => feed.title = text_buf.trim().to_string(),
+                        "id" => feed.id = text_buf.trim().to_string(),
                         _ => {}
                     }
                 }
@@ -285,5 +313,28 @@ fn handle_entry_end(ent: &mut Entry, name: &str, text: &str, stack: &[String]) {
         "identifier" => ent.identifiers.push(txt.to_string()),
         "series" => ent.series = Some(txt.to_string()),
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse;
+
+    #[test]
+    fn decodes_entities_in_text() {
+        let xml = br#"<?xml version="1.0"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <title>Tom &amp; Jerry</title>
+    <id>1</id>
+    <author><name>Jane Doe</name></author>
+    <summary type="html">They weren&#39;t &lt;b&gt;ready&lt;/b&gt;</summary>
+    <link rel="http://opds-spec.org/acquisition" href="/book.epub" type="application/epub+zip"/>
+  </entry>
+</feed>"#;
+        let feed = parse(xml, "https://example.com/feed").unwrap();
+        let ent = &feed.entries[0];
+        assert_eq!(ent.title, "Tom & Jerry");
+        assert_eq!(ent.summary.as_deref(), Some("They weren't <b>ready</b>"));
     }
 }
