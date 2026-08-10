@@ -9,10 +9,10 @@
 //!     attempting an upload.
 //! Device hostname is `crosspoint.local` via mDNS on both STA and AP modes.
 //!
-//! Library loans (`.acsm`) are no longer fulfilled by the firmware itself;
-//! newer firmware delegates that to the SD card's "Protected Content" plugin,
-//! driven from the device's web File Manager. We just upload the `.acsm` to
-//! the destination folder and tell the user to fulfill it there.
+//! Library loan files are no longer handled by the firmware itself; newer
+//! firmware delegates that to an SD plugin. We upload the loan file to the
+//! destination folder, then drive the firmware's plugin job APIs to fetch the
+//! book, falling back to manual instructions on older setups.
 
 use crate::plugins::{
     PluginDescriptor, SendContext, SendProgress, SendRequest, SendResult, SendTarget,
@@ -233,10 +233,10 @@ impl SendTarget for CrosspointTarget {
             .next()
             .map(|s| s.eq_ignore_ascii_case("epub"))
             .unwrap_or(false);
-        let is_acsm = filename
+        let is_loan = filename
             .rsplit('.')
             .next()
-            .map(|s| s.eq_ignore_ascii_case("acsm"))
+            .map(|s| s.eq_ignore_ascii_case(LOAN_EXT))
             .unwrap_or(false);
         if optimize_enabled && is_epub {
             let quality: u8 = settings
@@ -293,19 +293,46 @@ impl SendTarget for CrosspointTarget {
 
         upload_multipart(&client, &base, &folder, &filename, bytes, ctx, &host).await?;
 
-        // Library loans: the firmware no longer fulfills an uploaded .acsm
-        // itself — the SD card's Protected Content plugin does, from the
-        // device's web File Manager. Point the user there.
-        if is_acsm {
-            return Ok(SendResult {
-                ok: true,
-                message: format!(
-                    "uploaded {} to {}{}. To fetch the book, open the Crosspoint's web \
-                     File Manager in that folder and use Protected Content → Fetch \
-                     selected book.",
-                    filename, host, folder
-                ),
-            });
+        // Library loans: drive the device's plugin job APIs to fetch the book
+        // right now; if that machinery isn't available (old firmware, plugin
+        // missing, mobile build), fall back to pointing the user at the
+        // device's web File Manager.
+        if is_loan {
+            match fulfill_loan(&client, &base, &folder, &filename, req, ctx).await {
+                Ok(FulfillOutcome::Fulfilled { title, final_name }) => {
+                    return Ok(SendResult {
+                        ok: true,
+                        message: format!(
+                            "fetched \"{}\" to {}{} as {}",
+                            title, host, folder, final_name
+                        ),
+                    });
+                }
+                Ok(FulfillOutcome::Unavailable(reason)) => {
+                    tracing::info!("crosspoint auto-fulfill unavailable: {}", reason);
+                    return Ok(SendResult {
+                        ok: true,
+                        message: format!(
+                            "uploaded {} to {}{}. To fetch the book, open the Crosspoint's \
+                             web File Manager in that folder and use Protected Content → \
+                             Fetch selected book.",
+                            filename, host, folder
+                        ),
+                    });
+                }
+                Err(e) => {
+                    // The job ran and failed (e.g. device not activated). The
+                    // loan file is still on the card for a manual retry.
+                    return Err(anyhow!(
+                        "{} — the loan file was uploaded to {}{}, so you can retry from \
+                         the Crosspoint's web File Manager via Protected Content → Fetch \
+                         selected book.",
+                        e,
+                        host,
+                        folder
+                    ));
+                }
+            }
         }
 
         Ok(SendResult {
@@ -313,6 +340,435 @@ impl SendTarget for CrosspointTarget {
             message: format!("uploaded {} to {}{}", filename, host, folder),
         })
     }
+}
+
+// ======================================================================== //
+// Loan fulfillment via the device's plugin job APIs
+//
+//   POST /api/plugin-jobs {plugin, action:"fulfill", args:{path}} -> {id}
+//   GET  /api/plugin-jobs/status?id=N -> {state, result}
+//
+// Jobs only execute while a page hosting the SD plugin is open, so we spin up
+// a hidden webview on the device's /plugins-run page for the duration. When
+// the job finishes we read the resulting EPUB back, inspect its OPF metadata,
+// and rename it (plus its .rights sidecar) to "Title - Author.epub" instead
+// of the opaque name the loan file shipped with.
+// ======================================================================== //
+
+const PLUGIN_NAME: &str = "protected-content";
+/// Extension of library loan files the plugin's "fulfill" action accepts.
+const LOAN_EXT: &str = "acsm";
+const LOAN_MIME: &str = "application/vnd.adobe.adept+xml";
+const RUNNER_LABEL: &str = "crosspoint-runner";
+const FULFILL_TIMEOUT: Duration = Duration::from_secs(8 * 60);
+const FULFILL_POLL: Duration = Duration::from_secs(2);
+
+enum FulfillOutcome {
+    Fulfilled { title: String, final_name: String },
+    /// Auto-fulfillment couldn't start; not an error, fall back to the manual
+    /// instructions.
+    Unavailable(String),
+}
+
+#[derive(Deserialize)]
+struct PluginInfo {
+    #[serde(default)]
+    name: String,
+}
+
+#[derive(Deserialize)]
+struct JobSubmitResponse {
+    id: u64,
+}
+
+#[derive(Deserialize)]
+struct JobStatusResponse {
+    #[serde(default)]
+    state: String,
+    #[serde(default)]
+    result: Option<serde_json::Value>,
+}
+
+#[derive(Deserialize)]
+struct FileEntry {
+    #[serde(default)]
+    name: String,
+}
+
+async fn fulfill_loan(
+    client: &reqwest::Client,
+    base: &str,
+    folder: &str,
+    filename: &str,
+    req: &SendRequest,
+    ctx: &SendContext,
+) -> Result<FulfillOutcome> {
+    let Some(app) = ctx.app.as_ref() else {
+        return Ok(FulfillOutcome::Unavailable("no app handle".into()));
+    };
+    if cfg!(any(target_os = "ios", target_os = "android")) {
+        return Ok(FulfillOutcome::Unavailable(
+            "runner webview needs the desktop app".into(),
+        ));
+    }
+
+    // The handling plugin must be on the SD card for the job to ever run.
+    let plugins: Vec<PluginInfo> = match client.get(format!("{}/api/plugins", base)).send().await {
+        Ok(resp) if resp.status().is_success() => resp.json().await.unwrap_or_default(),
+        _ => return Ok(FulfillOutcome::Unavailable("firmware has no plugin API".into())),
+    };
+    if !plugins.iter().any(|p| p.name == PLUGIN_NAME) {
+        return Ok(FulfillOutcome::Unavailable(format!(
+            "{} plugin not on the SD card",
+            PLUGIN_NAME
+        )));
+    }
+
+    let device_path = join_device_path(folder, filename);
+    ctx.emit(SendProgress::stage(
+        "fulfill_queue",
+        "Queuing fulfillment on the device…",
+    ));
+    let submit = client
+        .post(format!("{}/api/plugin-jobs", base))
+        .json(&serde_json::json!({
+            "plugin": PLUGIN_NAME,
+            "action": "fulfill",
+            "args": { "path": device_path },
+        }))
+        .send()
+        .await;
+    let job_id = match submit {
+        Ok(resp) if resp.status().is_success() => {
+            match resp.json::<JobSubmitResponse>().await {
+                Ok(r) => r.id,
+                Err(e) => return Ok(FulfillOutcome::Unavailable(format!("bad job response: {}", e))),
+            }
+        }
+        Ok(resp) => {
+            return Ok(FulfillOutcome::Unavailable(format!(
+                "job submit returned HTTP {}",
+                resp.status()
+            )))
+        }
+        Err(e) => return Ok(FulfillOutcome::Unavailable(format!("job submit failed: {}", e))),
+    };
+
+    // Jobs only run while a page hosts the plugin; open the device's headless
+    // runner in a hidden webview for the duration.
+    if let Err(e) = runner::open(app, base) {
+        return Ok(FulfillOutcome::Unavailable(format!(
+            "could not open the runner webview: {}",
+            e
+        )));
+    }
+    let poll_result = poll_job(client, base, job_id, ctx).await;
+    runner::close(app);
+    let result = poll_result?;
+
+    let title = result
+        .get("title")
+        .and_then(|v| v.as_str())
+        .unwrap_or("book")
+        .to_string();
+    let dest = result
+        .get("dest")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .to_string();
+
+    // Name the fetched EPUB from its own metadata rather than whatever the
+    // job result called it.
+    let mut final_title = title.clone();
+    let mut final_name = dest.rsplit('/').next().unwrap_or(&dest).to_string();
+    if dest.ends_with(".epub") {
+        match rename_from_metadata(client, base, &dest, req, ctx).await {
+            Ok(Some((meta_title, new_name))) => {
+                final_title = meta_title;
+                final_name = new_name;
+            }
+            Ok(None) => {}
+            Err(e) => tracing::warn!("crosspoint metadata rename skipped: {}", e),
+        }
+    }
+
+    Ok(FulfillOutcome::Fulfilled {
+        title: final_title,
+        final_name,
+    })
+}
+
+async fn poll_job(
+    client: &reqwest::Client,
+    base: &str,
+    job_id: u64,
+    ctx: &SendContext,
+) -> Result<serde_json::Value> {
+    let started = std::time::Instant::now();
+    let mut last_state = String::new();
+    loop {
+        if started.elapsed() > FULFILL_TIMEOUT {
+            return Err(anyhow!(
+                "fulfillment timed out after {} minutes",
+                FULFILL_TIMEOUT.as_secs() / 60
+            ));
+        }
+        tokio::time::sleep(FULFILL_POLL).await;
+
+        let status: JobStatusResponse = match client
+            .get(format!("{}/api/plugin-jobs/status?id={}", base, job_id))
+            .send()
+            .await
+        {
+            Ok(resp) if resp.status().is_success() => match resp.json().await {
+                Ok(s) => s,
+                Err(_) => continue,
+            },
+            _ => continue,
+        };
+
+        if status.state != last_state {
+            last_state = status.state.clone();
+            let msg = match status.state.as_str() {
+                "pending" => Some("Waiting for the device…"),
+                "running" => Some("Fetching the book on the device…"),
+                _ => None,
+            };
+            if let Some(m) = msg {
+                ctx.emit(SendProgress::stage("fulfilling", m));
+            }
+        }
+
+        match status.state.as_str() {
+            "done" => {
+                ctx.emit(SendProgress::stage("fulfilled", "Book fetched on the device"));
+                return Ok(status.result.unwrap_or(serde_json::Value::Null));
+            }
+            "error" => {
+                let detail = status
+                    .result
+                    .as_ref()
+                    .and_then(|r| r.get("error"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("fulfillment failed on the device")
+                    .to_string();
+                return Err(anyhow!("Fulfillment failed: {}", detail));
+            }
+            "unknown" => {
+                return Err(anyhow!(
+                    "the device forgot the fulfillment job (it may have restarted)"
+                ));
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Read the fetched EPUB back from the device, inspect its OPF metadata, and
+/// rename the book (and its `.rights` sidecar) to "Title - Author.epub".
+/// Returns `(display_title, new_file_name)` when a rename happened.
+async fn rename_from_metadata(
+    client: &reqwest::Client,
+    base: &str,
+    dest: &str,
+    req: &SendRequest,
+    ctx: &SendContext,
+) -> Result<Option<(String, String)>> {
+    ctx.emit(SendProgress::stage("naming", "Reading EPUB metadata…"));
+    let resp = client
+        .get(format!(
+            "{}/download?path={}",
+            base,
+            urlencode_path_component(dest)
+        ))
+        .send()
+        .await?;
+    if !resp.status().is_success() {
+        return Err(anyhow!("could not read back the EPUB (HTTP {})", resp.status()));
+    }
+    let bytes = resp.bytes().await?;
+    let meta = crate::epub::inspect_bytes(&bytes)?;
+
+    let title = meta
+        .title
+        .filter(|t| !t.trim().is_empty())
+        .or_else(|| req.title.clone())
+        .filter(|t| !t.trim().is_empty());
+    let Some(title) = title else { return Ok(None) };
+    let author = meta
+        .authors
+        .first()
+        .cloned()
+        .filter(|a| !a.trim().is_empty())
+        .or_else(|| req.author.clone());
+
+    // Cap the stem so long titles stay FAT-friendly.
+    let desired = {
+        let name = crate::downloads::build_filename(&title, author.as_deref(), "epub");
+        let stem = name.trim_end_matches(".epub");
+        let capped: String = stem.chars().take(80).collect();
+        format!("{}.epub", capped.trim_end())
+    };
+
+    let current = dest.rsplit('/').next().unwrap_or(dest);
+    if desired.eq_ignore_ascii_case(current) {
+        return Ok(None);
+    }
+
+    let dir = match dest.rfind('/') {
+        Some(0) | None => "/".to_string(),
+        Some(i) => dest[..i].to_string(),
+    };
+    let new_name = pick_free_name(client, base, &dir, &desired, current).await?;
+
+    // Rename the rights sidecar first — the reader pairs it to the book by
+    // filename, so the book must never end up renamed without it. A 404 just
+    // means there is no sidecar.
+    let rights_old = format!("{}.rights", dest);
+    let rights_new = format!("{}.rights", new_name);
+    let rights_status = rename_on_device(client, base, &rights_old, &rights_new).await?;
+    if !rights_status.is_success() && rights_status.as_u16() != 404 {
+        return Err(anyhow!("rights sidecar rename returned HTTP {}", rights_status));
+    }
+    let had_rights = rights_status.is_success();
+
+    let epub_status = rename_on_device(client, base, dest, &new_name).await?;
+    if !epub_status.is_success() {
+        if had_rights {
+            // Roll the sidecar back so the pair stays consistent.
+            let rolled = join_device_path(&dir, &rights_new);
+            let orig = rights_old.rsplit('/').next().unwrap_or(&rights_old);
+            let _ = rename_on_device(client, base, &rolled, orig).await;
+        }
+        return Err(anyhow!("EPUB rename returned HTTP {}", epub_status));
+    }
+
+    ctx.emit(SendProgress::stage(
+        "renamed",
+        format!("Named it {}", new_name),
+    ));
+    Ok(Some((title, new_name)))
+}
+
+/// `POST /rename?path=<file>&name=<new base name>`.
+async fn rename_on_device(
+    client: &reqwest::Client,
+    base: &str,
+    path: &str,
+    new_name: &str,
+) -> Result<reqwest::StatusCode> {
+    let url = format!(
+        "{}/rename?path={}&name={}",
+        base,
+        urlencode_path_component(path),
+        urlencode_path_component(new_name)
+    );
+    Ok(client.post(&url).send().await?.status())
+}
+
+/// Choose `desired` or "stem (n).epub" so that neither the name nor its
+/// `.rights` sidecar collides with an existing file in `dir`.
+async fn pick_free_name(
+    client: &reqwest::Client,
+    base: &str,
+    dir: &str,
+    desired: &str,
+    current: &str,
+) -> Result<String> {
+    let entries: Vec<FileEntry> = client
+        .get(format!(
+            "{}/api/files?path={}",
+            base,
+            urlencode_path_component(dir)
+        ))
+        .send()
+        .await?
+        .json()
+        .await
+        .unwrap_or_default();
+    let mut taken: std::collections::HashSet<String> = entries
+        .into_iter()
+        .map(|e| e.name.to_lowercase())
+        .collect();
+    // The file being renamed doesn't block its own new name.
+    taken.remove(&current.to_lowercase());
+    taken.remove(&format!("{}.rights", current.to_lowercase()));
+
+    let stem = desired.trim_end_matches(".epub");
+    for n in 1..100 {
+        let candidate = if n == 1 {
+            format!("{}.epub", stem)
+        } else {
+            format!("{} ({}).epub", stem, n)
+        };
+        let lower = candidate.to_lowercase();
+        if !taken.contains(&lower) && !taken.contains(&format!("{}.rights", lower)) {
+            return Ok(candidate);
+        }
+    }
+    Err(anyhow!("could not find a free name for {}", desired))
+}
+
+fn join_device_path(dir: &str, name: &str) -> String {
+    if dir == "/" {
+        format!("/{}", name)
+    } else {
+        format!("{}/{}", dir.trim_end_matches('/'), name)
+    }
+}
+
+/// Hidden webview hosting the device's /plugins-run page, which executes
+/// queued plugin jobs. Desktop only — mobile Tauri can't create extra webview
+/// windows.
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+mod runner {
+    use super::RUNNER_LABEL;
+    use anyhow::{anyhow, Result};
+    use tauri::{AppHandle, Manager, WebviewUrl};
+
+    pub fn open(app: &AppHandle, base: &str) -> Result<()> {
+        close(app);
+        let url: tauri::Url = format!("{}/plugins-run", base).parse()?;
+        // Window creation must happen on the main thread (macOS requirement);
+        // block briefly so we can report failures.
+        let (tx, rx) = std::sync::mpsc::channel::<Result<(), String>>();
+        let handle = app.clone();
+        app.run_on_main_thread(move || {
+            let result = tauri::WebviewWindowBuilder::new(
+                &handle,
+                RUNNER_LABEL,
+                WebviewUrl::External(url),
+            )
+            .title("Crosspoint fulfillment")
+            .visible(false)
+            .skip_taskbar(true)
+            .build()
+            .map(|_| ())
+            .map_err(|e| e.to_string());
+            let _ = tx.send(result);
+        })?;
+        rx.recv_timeout(std::time::Duration::from_secs(5))
+            .map_err(|_| anyhow!("timed out creating the runner webview"))?
+            .map_err(|e| anyhow!(e))
+    }
+
+    pub fn close(app: &AppHandle) {
+        if let Some(w) = app.get_webview_window(RUNNER_LABEL) {
+            let _ = w.destroy();
+        }
+    }
+}
+
+#[cfg(any(target_os = "ios", target_os = "android"))]
+mod runner {
+    use anyhow::{anyhow, Result};
+    use tauri::AppHandle;
+
+    pub fn open(_app: &AppHandle, _base: &str) -> Result<()> {
+        Err(anyhow!("not supported on mobile"))
+    }
+
+    pub fn close(_app: &AppHandle) {}
 }
 
 /// `POST /upload?path=<dir>` with a multipart body, the firmware's plain file
@@ -531,7 +987,7 @@ fn mime_for(filename: &str) -> &'static str {
         "pdf" => "application/pdf",
         "mobi" => "application/x-mobipocket-ebook",
         "azw3" => "application/vnd.amazon.ebook",
-        "acsm" => "application/vnd.adobe.adept+xml",
+        e if e == LOAN_EXT => LOAN_MIME,
         "cbz" => "application/vnd.comicbook+zip",
         "cbr" => "application/vnd.comicbook-rar",
         "txt" => "text/plain",

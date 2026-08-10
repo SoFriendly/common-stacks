@@ -801,6 +801,7 @@ pub async fn fetch_kindle_relay_info(send_url: String) -> CmdResult<RelayInfo> {
 
 #[tauri::command]
 pub async fn send_book(
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
     request: SendRequest,
     on_progress: tauri::ipc::Channel<SendProgress>,
@@ -819,6 +820,7 @@ pub async fn send_book(
     let settings = SendTargetSettings { fields };
     let ctx = SendContext {
         progress: on_progress,
+        app: Some(app),
     };
     target.send(&request, &settings, &ctx).await.map_err(err)
 }

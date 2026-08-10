@@ -124,10 +124,13 @@ impl SendProgress {
 }
 
 /// Context passed to `SendTarget::send` so plugins can stream progress back to
-/// the UI. Cheap to clone — wraps a Tauri Channel internally.
+/// the UI. Cheap to clone — wraps a Tauri Channel internally. The app handle
+/// lets targets that need a helper webview (e.g. the Crosspoint plugin-job
+/// runner page) create one; None when there is no running app (tests).
 #[derive(Clone)]
 pub struct SendContext {
     pub progress: tauri::ipc::Channel<SendProgress>,
+    pub app: Option<tauri::AppHandle>,
 }
 
 impl SendContext {
