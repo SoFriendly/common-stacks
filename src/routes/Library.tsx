@@ -271,8 +271,24 @@ export function Library() {
 
   useEffect(() => {
     if (cachedBlocks && Date.now() - cachedAt < SWR_TTL_MS) {
-      // Cache is warm — show it instantly, no fetch.
-      return;
+      // Cache is warm — show it instantly. But the user may have toggled,
+      // added, or removed sources in Settings since it was captured, so
+      // verify the enabled source set still matches before trusting it.
+      let cancelled = false;
+      (async () => {
+        const enabled = (await api.listSources()).filter((s) => s.enabled);
+        if (cancelled) return;
+        const cachedKey = (cachedBlocks ?? [])
+          .map((b) => `${b.source.id} ${b.source.url}`)
+          .join("|");
+        const currentKey = enabled
+          .map((s) => `${s.id} ${s.url}`)
+          .join("|");
+        if (cachedKey !== currentKey) loadLibrary();
+      })();
+      return () => {
+        cancelled = true;
+      };
     }
     if (cachedBlocks) {
       // We already have something to render; refresh in background.
@@ -375,7 +391,7 @@ export function Library() {
                 <>
                   Add an OPDS library in Settings and you'll see books here.
                   Mayberry and Project Gutenberg ship pre-configured if you'd
-                  like to start there — just flip them on in Settings.
+                  like to start there. Just flip them on in Settings.
                 </>
               }
               primary={{

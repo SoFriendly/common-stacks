@@ -8,6 +8,7 @@ import { Book } from "./routes/Book";
 import { Libby } from "./routes/Libby";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { UpdateChecker } from "./components/UpdateChecker";
+import { OnboardingModal } from "./components/OnboardingModal";
 import { MobileHeader } from "./components/MobileHeader";
 import { MobileTabBar } from "./components/MobileTabBar";
 import { MobileSearchProvider } from "./lib/mobileSearch";
@@ -52,6 +53,7 @@ export default function App() {
         </main>
         {isMobile && <MobileTabBar />}
         {!isMobile && <UpdateChecker />}
+        <OnboardingModal />
       </div>
     </MobileSearchProvider>
   );
