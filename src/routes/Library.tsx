@@ -375,7 +375,7 @@ export function Library() {
                 <>
                   Add an OPDS library in Settings and you'll see books here.
                   Mayberry and Project Gutenberg ship pre-configured if you'd
-                  like to start there.
+                  like to start there — just flip them on in Settings.
                 </>
               }
               primary={{

@@ -152,11 +152,12 @@ pub fn load_or_seed() -> Config {
     }
     let seeded = Config {
         sources: vec![
+            // Mayberry ships disabled — users opt in via Settings → Libraries.
             Source {
                 id: "mayberry".into(),
                 name: "Mayberry".into(),
                 url: "https://mayberry.pub".into(),
-                enabled: true,
+                enabled: false,
                 auth: AuthConfig::None,
             },
             Source {
