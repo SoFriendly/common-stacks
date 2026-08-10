@@ -80,6 +80,30 @@ function Get-ReleaseNotes {
     return ($notes -join "`n")
 }
 $NOTES = Get-ReleaseNotes
+$PUB_DATE = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+
+# Independent per-platform updater manifest (new mechanism). Each platform's
+# manifest carries its own version/notes/pub_date, so platforms no longer need
+# to share a single version number to avoid update-check nag loops. Written
+# to updater/<target>-<arch>/latest.json, matching the {{target}}-{{arch}}
+# templated endpoint in tauri.conf.json.
+function Write-PlatformManifest {
+    param([string]$Platform, [string]$Sig, [string]$Url)
+    if (-not $Sig) { return }
+    $manifest = [PSCustomObject]@{
+        version   = $VERSION
+        notes     = $NOTES
+        pub_date  = $PUB_DATE
+        platforms = [PSCustomObject]@{
+            $Platform = [PSCustomObject]@{ signature = $Sig; url = $Url }
+        }
+    }
+    $tmpPath = Join-Path $env:TEMP "latest-$Platform.json"
+    $json = $manifest | ConvertTo-Json -Depth 10
+    [System.IO.File]::WriteAllText($tmpPath, $json, [System.Text.UTF8Encoding]::new($false))
+    Upload-File $tmpPath "updater/$Platform/latest.json"
+    Remove-Item $tmpPath -Force -ErrorAction SilentlyContinue
+}
 
 Write-Host ""
 Write-Host "=== Uploading Windows artifacts ===" -ForegroundColor Green
@@ -119,6 +143,10 @@ if ($nsisFile -and (Test-Path "$($nsisFile.FullName).sig")) {
     $winSig = (Get-Content "$($msiFile.FullName).sig" -Raw).Trim()
     $winUrl = "$PUBLIC_BASE/v$VERSION/${APP}_${VERSION}_x64-setup.msi"
 }
+
+# New independent mechanism: this platform's manifest advances on its own,
+# regardless of whether macOS/Linux have caught up to this version yet.
+Write-PlatformManifest -Platform "windows-x86_64" -Sig $winSig -Url $winUrl
 
 if (-not $winSig) {
     Write-Warning "No Windows .sig found — skipping latest.json merge"
@@ -180,9 +208,9 @@ foreach ($platform in $desktopPlatforms) {
 if ($desktopReady) {
     $latest | Add-Member -NotePropertyName version  -NotePropertyValue $VERSION -Force
     $latest | Add-Member -NotePropertyName notes    -NotePropertyValue $NOTES -Force
-    $latest | Add-Member -NotePropertyName pub_date -NotePropertyValue ((Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")) -Force
+    $latest | Add-Member -NotePropertyName pub_date -NotePropertyValue $PUB_DATE -Force
 } else {
-    Write-Warning "Preserving existing Tauri manifest version until every desktop artifact is v$VERSION"
+    Write-Warning "Preserving existing legacy manifest version until every desktop artifact is v$VERSION (only matters for Android and pre-migration clients still on the old endpoint)"
 }
 
 $json = $latest | ConvertTo-Json -Depth 10
@@ -192,4 +220,5 @@ Upload-File $latestJsonPath "latest.json"
 
 Write-Host ""
 Write-Host "=== Upload complete ===" -ForegroundColor Green
-Write-Host "Update endpoint: $PUBLIC_BASE/latest.json"
+Write-Host "Per-platform update endpoint: $PUBLIC_BASE/updater/windows-x86_64/latest.json"
+Write-Host "Legacy/Android endpoint: $PUBLIC_BASE/latest.json"

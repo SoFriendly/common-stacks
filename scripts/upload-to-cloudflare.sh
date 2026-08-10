@@ -160,15 +160,37 @@ add_platform() {
   TAURI_UPDATED=1
 }
 
+# Independent per-platform updater manifest (new mechanism). Each platform's
+# manifest carries its own version/notes/pub_date, so platforms no longer need
+# to share a single version number to avoid update-check nag loops. Written to
+# updater/<target>-<arch>/latest.json, matching the {{target}}-{{arch}}
+# templated endpoint in tauri.conf.json.
+write_platform_manifest() {
+  local platform=$1 sig=$2 url=$3
+  [ -n "$sig" ] || return 0
+  local tmp
+  tmp=$(mktemp)
+  jq -n --arg ver "$VERSION" --arg notes "$NOTES" --arg pub_date "$PUB_DATE" \
+    --arg platform "$platform" --arg sig "$sig" --arg url "$url" \
+    '{version: $ver, notes: $notes, pub_date: $pub_date, platforms: {($platform): {signature: $sig, url: $url}}}' \
+    > "$tmp"
+  upload "$tmp" "updater/${platform}/latest.json"
+  rm -f "$tmp"
+}
+
 if [ -n "$MAC_SIG" ]; then
   # Universal binary — both arm64 and x86_64 installs pull the same tarball.
   MAC_URL="${PUBLIC_BASE}/v${VERSION}/${APP}_${VERSION}_darwin-universal.app.tar.gz"
   add_platform "darwin-aarch64" "$MAC_SIG" "$MAC_URL"
   add_platform "darwin-x86_64" "$MAC_SIG" "$MAC_URL"
+  write_platform_manifest "darwin-aarch64" "$MAC_SIG" "$MAC_URL"
+  write_platform_manifest "darwin-x86_64" "$MAC_SIG" "$MAC_URL"
 fi
 
 add_platform "linux-x86_64" "$LINUX_X64_SIG" "${PUBLIC_BASE}/v${VERSION}/${APP}_${VERSION}_amd64.AppImage"
 add_platform "linux-aarch64" "$LINUX_ARM_SIG" "${PUBLIC_BASE}/v${VERSION}/${APP}_${VERSION}_arm64.AppImage"
+write_platform_manifest "linux-x86_64" "$LINUX_X64_SIG" "${PUBLIC_BASE}/v${VERSION}/${APP}_${VERSION}_amd64.AppImage"
+write_platform_manifest "linux-aarch64" "$LINUX_ARM_SIG" "${PUBLIC_BASE}/v${VERSION}/${APP}_${VERSION}_arm64.AppImage"
 
 if [ -f "$ANDROID_APK" ] && [ -n "$ANDROID_SIG" ]; then
   jq --arg url "${PUBLIC_BASE}/v${ANDROID_VERSION_NAME}/${APP}_${ANDROID_VERSION_NAME}_arm64.apk" \
@@ -188,8 +210,10 @@ fi
 
 if [ -n "$WIN_NSIS_SIG" ]; then
   add_platform "windows-x86_64" "$WIN_NSIS_SIG" "${PUBLIC_BASE}/v${VERSION}/${APP}_${VERSION}_x64-setup.exe"
+  write_platform_manifest "windows-x86_64" "$WIN_NSIS_SIG" "${PUBLIC_BASE}/v${VERSION}/${APP}_${VERSION}_x64-setup.exe"
 elif [ -n "$WIN_MSI_SIG" ]; then
   add_platform "windows-x86_64" "$WIN_MSI_SIG" "${PUBLIC_BASE}/v${VERSION}/${APP}_${VERSION}_x64-setup.msi"
+  write_platform_manifest "windows-x86_64" "$WIN_MSI_SIG" "${PUBLIC_BASE}/v${VERSION}/${APP}_${VERSION}_x64-setup.msi"
 fi
 
 DESKTOP_PLATFORMS='[
@@ -233,4 +257,5 @@ else
   echo "No signatures found; not updating latest.json"
 fi
 
-echo "Done. https://releases.commonstacks.com/latest.json"
+echo "Done. Per-platform update endpoints under https://releases.commonstacks.com/updater/<target>-<arch>/latest.json"
+echo "Legacy/Android endpoint: https://releases.commonstacks.com/latest.json"

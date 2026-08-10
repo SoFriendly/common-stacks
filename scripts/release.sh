@@ -33,6 +33,10 @@ Build and upload Windows v$VERSION from the signed Windows machine:
 
   .\scripts\build-windows.ps1 --no-bump -Upload
 
-latest.json will advertise v$VERSION only after macOS, Linux, and Windows
-updater artifacts all point to that version.
+Each platform now publishes its own independent updater manifest under
+updater/<target>-<arch>/latest.json, so macOS/Linux/Windows clients update
+as soon as their own build lands — they no longer wait on each other.
+The legacy shared latest.json (used by Android and pre-migration desktop
+clients) still only advertises v$VERSION once every desktop platform has
+published it.
 EOF
