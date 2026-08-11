@@ -72,7 +72,6 @@ type CmdResult<T> = Result<T, String>;
 mod desktop {
     use super::{LibbyBounds, LABEL};
     use crate::state::AppState;
-    use std::time::Duration;
     use tauri::webview::{DownloadEvent, WebviewBuilder};
     use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewUrl};
 
@@ -255,23 +254,21 @@ mod desktop {
                 true
             });
 
-        // Webview creation must happen on the main thread (macOS requirement);
-        // block briefly so the command can report failures.
-        let (tx, rx) = std::sync::mpsc::channel::<Result<(), String>>();
-        let position = LogicalPosition::new(bounds.x, bounds.y);
-        let size = LogicalSize::new(bounds.width, bounds.height);
-        let win = window.clone();
+        // `add_child` hops to the main thread itself and blocks until the
+        // webview exists. It must therefore NOT be called from the main
+        // thread: on Windows the caller is then inside WebView2's IPC
+        // callback, and creating a controller re-enters WebView2 — its
+        // completion callback never arrives and wry's nested message pump
+        // spins forever, leaving an empty Libby pane. `libby_show` is
+        // declared `#[tauri::command(async)]` to keep us off that thread.
         window
-            .run_on_main_thread(move || {
-                let result = win
-                    .add_child(builder, position, size)
-                    .map(|_| ())
-                    .map_err(|e| e.to_string());
-                let _ = tx.send(result);
-            })
-            .map_err(err)?;
-        rx.recv_timeout(Duration::from_secs(5))
-            .map_err(|_| "timed out creating the Libby view".to_string())?
+            .add_child(
+                builder,
+                LogicalPosition::new(bounds.x, bounds.y),
+                LogicalSize::new(bounds.width, bounds.height),
+            )
+            .map(|_| ())
+            .map_err(err)
     }
 }
 
@@ -380,7 +377,11 @@ mod commands_impl {
     }
 }
 
-#[tauri::command]
+// `async` so Tauri runs this off the main thread: creating the child webview
+// blocks until WebView2/WKWebView hands the view back, and on Windows a
+// synchronous command would be running inside WebView2's own IPC callback,
+// where that wait deadlocks (see `desktop::create`).
+#[tauri::command(async)]
 pub fn libby_show(app: tauri::AppHandle, bounds: LibbyBounds) -> CmdResult<()> {
     commands_impl::show(&app, &bounds)
 }
