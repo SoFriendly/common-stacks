@@ -8,6 +8,9 @@ import { maybeApply as applyEnrichmentToEntry } from "../lib/enrichment";
 import { primaryBadge, formatLabel, isAudiobookEntry } from "../lib/format";
 import { useIsMobile } from "../lib/platform";
 
+/** Facets shown per group before collapsing behind "+N more". */
+const FACETS_SHOWN = 10;
+
 export function Browse() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -21,6 +24,9 @@ export function Browse() {
   const [error, setError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const loadingMoreRef = useRef(false);
+  const [expandedFacetGroups, setExpandedFacetGroups] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   useEffect(() => {
     if (!sourceId || !href) return;
@@ -28,6 +34,7 @@ export function Browse() {
     setLoading(true);
     setError(null);
     setFeed(null);
+    setExpandedFacetGroups(new Set());
     (async () => {
       try {
         const r = await api.fetchFeed(sourceId, href);
@@ -58,6 +65,7 @@ export function Browse() {
         return {
           ...r.feed,
           navigation: prev.navigation,
+          facets: prev.facets,
           entries: [...prev.entries, ...fresh],
           next: fresh.length > 0 ? r.feed.next : undefined,
         };
@@ -118,9 +126,61 @@ export function Browse() {
         </section>
       )}
 
+      {!loading && feed && feed.facets.length > 0 && (
+        <section className="mb-10">
+          <h2 className="mb-3 font-display text-xl">Refine</h2>
+          <div className="space-y-4">
+            {feed.facets.map((g) => {
+              const expanded = expandedFacetGroups.has(g.title);
+              const shown = expanded ? g.facets : g.facets.slice(0, FACETS_SHOWN);
+              const hidden = g.facets.length - shown.length;
+              return (
+                <div key={g.title}>
+                  {g.title && (
+                    <h3 className="mb-1.5 text-xs uppercase tracking-wider text-ink-soft">
+                      {g.title}
+                    </h3>
+                  )}
+                  <div className="flex flex-wrap gap-1.5">
+                    {shown.map((f, i) => (
+                      <button
+                        key={i}
+                        onClick={() => go(f.href, f.title || title)}
+                        className={`rounded-full px-2.5 py-0.5 text-xs transition-colors ${
+                          f.active
+                            ? "bg-ink text-paper"
+                            : "bg-shelf text-ink-soft hover:text-ink"
+                        }`}
+                      >
+                        {f.title}
+                        {f.count != null && (
+                          <span className="ml-1 opacity-60">{f.count}</span>
+                        )}
+                      </button>
+                    ))}
+                    {hidden > 0 && (
+                      <button
+                        onClick={() =>
+                          setExpandedFacetGroups((prev) =>
+                            new Set(prev).add(g.title),
+                          )
+                        }
+                        className="rounded-full border border-shelf px-2.5 py-0.5 text-xs text-ink-soft hover:text-ink"
+                      >
+                        +{hidden} more
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {!loading && feed && feed.entries.length > 0 && (
         <section>
-          {subsections.length > 0 && (
+          {(subsections.length > 0 || feed.facets.length > 0) && (
             <h2 className="mb-3 font-display text-xl">Titles</h2>
           )}
           <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-x-5 gap-y-8">

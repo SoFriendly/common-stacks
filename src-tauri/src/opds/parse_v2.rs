@@ -1,4 +1,4 @@
-use super::feed::{Acquisition, Entry, Feed, Link};
+use super::feed::{Acquisition, Entry, Facet, FacetGroup, Feed, Link};
 use anyhow::Result;
 use serde_json::Value;
 use url::Url;
@@ -33,6 +33,43 @@ pub fn parse(bytes: &[u8], base_url: &str) -> Result<Feed> {
                     }
                 }
                 _ => feed.navigation.push(Link { href, rel, title, mime }),
+            }
+        }
+    }
+
+    // OPDS 2.0 facets: an array of collections, each with a metadata title
+    // and links refining the current feed.
+    if let Some(facets) = v.get("facets").and_then(|x| x.as_array()) {
+        for fc in facets {
+            let group = fc
+                .get("metadata")
+                .and_then(|m| m.get("title"))
+                .and_then(|x| x.as_str())
+                .unwrap_or("")
+                .to_string();
+            let links = match fc.get("links").and_then(|x| x.as_array()) {
+                Some(ls) => ls,
+                None => continue,
+            };
+            let mut out = Vec::new();
+            for l in links {
+                let (href, rel, _mime, title) = link_parts(l, &base);
+                if href.is_empty() {
+                    continue;
+                }
+                out.push(Facet {
+                    href,
+                    title: title.unwrap_or_default(),
+                    count: l
+                        .get("properties")
+                        .and_then(|p| p.get("numberOfItems"))
+                        .and_then(|x| x.as_u64()),
+                    // The applied facet points back at the current feed.
+                    active: rel.as_deref() == Some("self"),
+                });
+            }
+            if !out.is_empty() {
+                feed.facets.push(FacetGroup { title: group, facets: out });
             }
         }
     }

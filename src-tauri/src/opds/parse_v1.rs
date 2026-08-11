@@ -1,4 +1,4 @@
-use super::feed::{Acquisition, Entry, Feed, Link};
+use super::feed::{Acquisition, Entry, Facet, FacetGroup, Feed, Link};
 use anyhow::Result;
 use quick_xml::events::Event;
 use quick_xml::name::QName;
@@ -256,9 +256,29 @@ fn handle_feed_link(feed: &mut Feed, attrs: &[(String, String)], base: &Option<U
                 feed.search_template = Some(href);
             }
         }
+        Some("http://opds-spec.org/facet") => {
+            // Attribute keys are stripped to local names, so
+            // opds:facetGroup → facetGroup and thr:count → count.
+            let group = attr(attrs, "facetGroup").unwrap_or("").to_string();
+            let facet = Facet {
+                href,
+                title: title.unwrap_or_default(),
+                count: attr(attrs, "count").and_then(|c| c.parse().ok()),
+                active: attr(attrs, "activeFacet") == Some("true"),
+            };
+            push_facet(feed, group, facet);
+        }
         _ => {
             feed.navigation.push(Link { href, rel, title, mime });
         }
+    }
+}
+
+fn push_facet(feed: &mut Feed, group: String, facet: Facet) {
+    if let Some(g) = feed.facets.iter_mut().find(|g| g.title == group) {
+        g.facets.push(facet);
+    } else {
+        feed.facets.push(FacetGroup { title: group, facets: vec![facet] });
     }
 }
 
@@ -298,10 +318,11 @@ fn handle_entry_start(
             ent.navigation.push(Link { href, rel, title, mime });
         }
     } else if name == "category" {
-        if let Some(term) = attr(attrs, "term") {
-            ent.categories.push(term.to_string());
-        } else if let Some(label) = attr(attrs, "label") {
+        // label is the human-readable form; term is the machine code.
+        if let Some(label) = attr(attrs, "label") {
             ent.categories.push(label.to_string());
+        } else if let Some(term) = attr(attrs, "term") {
+            ent.categories.push(term.to_string());
         }
     }
 }
@@ -391,5 +412,42 @@ mod tests {
         let feed = parse(xml, "https://example.com/feed").unwrap();
         assert_eq!(feed.entries.len(), 1);
         assert_eq!(feed.entries[0].title, "Frankenstein");
+    }
+
+    #[test]
+    fn facet_links_are_grouped_not_navigation() {
+        let xml = br#"<?xml version="1.0"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:opds="http://opds-spec.org/2010/catalog" xmlns:thr="http://purl.org/syndication/thread/1.0">
+  <link href="/feed/tags/7/Fantasy" rel="http://opds-spec.org/facet" title="Fantasy" opds:facetGroup="Tags" thr:count="2"/>
+  <link href="/feed/tags/1/Funny" rel="http://opds-spec.org/facet" title="Funny" opds:facetGroup="Tags" opds:activeFacet="true"/>
+  <link href="/feed/ratings/1/4_stars" rel="http://opds-spec.org/facet" title="4 stars" opds:facetGroup="Ratings" thr:count="1"/>
+</feed>"#;
+        let feed = parse(xml, "https://example.com/feed").unwrap();
+        assert!(feed.navigation.is_empty());
+        assert_eq!(feed.facets.len(), 2);
+        let tags = &feed.facets[0];
+        assert_eq!(tags.title, "Tags");
+        assert_eq!(tags.facets.len(), 2);
+        assert_eq!(tags.facets[0].title, "Fantasy");
+        assert_eq!(tags.facets[0].count, Some(2));
+        assert!(!tags.facets[0].active);
+        assert!(tags.facets[1].active);
+        assert_eq!(feed.facets[1].title, "Ratings");
+    }
+
+    #[test]
+    fn category_prefers_label_over_term() {
+        let xml = br#"<?xml version="1.0"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <title>Book</title>
+    <id>1</id>
+    <category term="FIC009000" label="Fantasy"/>
+    <category term="Humour"/>
+    <link rel="http://opds-spec.org/acquisition" href="/b.epub" type="application/epub+zip"/>
+  </entry>
+</feed>"#;
+        let feed = parse(xml, "https://example.com/feed").unwrap();
+        assert_eq!(feed.entries[0].categories, vec!["Fantasy", "Humour"]);
     }
 }

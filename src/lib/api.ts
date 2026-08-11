@@ -46,11 +46,24 @@ export interface Entry {
   navigation: Link[];
 }
 
+export interface Facet {
+  href: string;
+  title: string;
+  count?: number;
+  active: boolean;
+}
+
+export interface FacetGroup {
+  title: string;
+  facets: Facet[];
+}
+
 export interface Feed {
   title: string;
   id: string;
   entries: Entry[];
   navigation: Link[];
+  facets: FacetGroup[];
   next?: string;
   prev?: string;
   self_link?: string;
