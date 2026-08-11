@@ -147,17 +147,22 @@ pub fn parse(bytes: &[u8], base_url: &str) -> Result<Feed> {
                         // <link rel="subsection".../></entry>) or a book entry
                         // that happens to use a subsection link to its detail
                         // page (Gutenberg pattern, with thumbnail + author in
-                        // <content>). A subsection link that declares the OPDS
-                        // catalog profile in its type points at another feed,
-                        // so the entry is nav even when it carries a blurb and
-                        // an icon thumbnail (COPS does both: "51 books" +
-                        // custom.png). Otherwise fall back to the heuristic:
-                        // no cover, no thumbnail, and no summary means nav.
+                        // <content>). A link whose type declares the OPDS
+                        // catalog profile points at another feed, so the entry
+                        // is nav even when it carries a blurb and an icon
+                        // thumbnail (COPS does both: "51 books" + custom.png).
+                        // The rel varies (subsection, sort/new, none), so key
+                        // off the type — excluding type=entry documents (a
+                        // book's own detail page) and rel=related (COPS books
+                        // link "Other books by X" with a catalog type).
+                        // Otherwise fall back to the heuristic: no cover, no
+                        // thumbnail, and no summary means nav.
                         let links_to_catalog = ent.navigation.iter().any(|l| {
-                            matches!(l.rel.as_deref(), None | Some("subsection"))
-                                && l.mime
-                                    .as_deref()
-                                    .is_some_and(|m| m.contains("profile=opds-catalog"))
+                            l.rel.as_deref() != Some("related")
+                                && l.mime.as_deref().is_some_and(|m| {
+                                    m.contains("profile=opds-catalog")
+                                        && !m.contains("type=entry")
+                                })
                         });
                         let is_pure_nav = ent.acquisitions.is_empty()
                             && !ent.navigation.is_empty()
@@ -412,6 +417,35 @@ mod tests {
         let feed = parse(xml, "https://example.com/feed").unwrap();
         assert_eq!(feed.entries.len(), 1);
         assert_eq!(feed.entries[0].title, "Frankenstein");
+    }
+
+    #[test]
+    fn sorted_catalog_entry_is_navigation() {
+        // COPS "Recent additions" uses a sort rel instead of subsection;
+        // the catalog-profile type still marks it as navigation. A book's
+        // own detail document (type=entry) must not.
+        let xml = br#"<?xml version="1.0"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <title>Recent additions</title>
+    <id>cops:recentbooks</id>
+    <content type="text">50 most recent books</content>
+    <link href="/feed/recent" type="application/atom+xml;profile=opds-catalog;kind=acquisition" rel="http://opds-spec.org/sort/new"/>
+    <link href="/images/recent.png" type="image/png" rel="http://opds-spec.org/image/thumbnail" title="icon"/>
+  </entry>
+  <entry>
+    <title>A Book</title>
+    <id>book:1</id>
+    <content type="text">A summary.</content>
+    <link href="/entry/1" type="application/atom+xml;type=entry;profile=opds-catalog" rel="alternate"/>
+    <link href="/thumb/1.jpg" type="image/jpeg" rel="http://opds-spec.org/image/thumbnail"/>
+  </entry>
+</feed>"#;
+        let feed = parse(xml, "https://example.com/feed").unwrap();
+        assert_eq!(feed.entries.len(), 1);
+        assert_eq!(feed.entries[0].title, "A Book");
+        assert_eq!(feed.navigation.len(), 1);
+        assert_eq!(feed.navigation[0].title.as_deref(), Some("Recent additions"));
     }
 
     #[test]
