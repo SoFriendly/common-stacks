@@ -1,5 +1,34 @@
-import type { Entry } from "./api";
+import type { Entry, Link } from "./api";
 import type { NavigateFunction } from "react-router";
+
+/**
+ * Keep only the navigation links worth showing as browsable subsections.
+ * Drops structural rels (self/up/start/pagination), search, and facet or
+ * shelf links (COPS emits a facet link per tag, author, and rating, which
+ * would otherwise flood the category grid).
+ */
+export function pickSubsections(navigation: Link[]): Link[] {
+  const skip = new Set([
+    "self",
+    "next",
+    "previous",
+    "prev",
+    "up",
+    "start",
+    "search",
+    "alternate",
+    "first",
+    "last",
+    "shelf",
+    "http://opds-spec.org/shelf",
+    "http://opds-spec.org/facet",
+    "http://opds-spec.org/featured",
+  ]);
+  return navigation.filter((l) => {
+    const r = (l.rel ?? "").toLowerCase();
+    return !skip.has(r) && !r.includes("opensearch");
+  });
+}
 
 /**
  * Decide whether an OPDS entry represents a book (has acquisitions or

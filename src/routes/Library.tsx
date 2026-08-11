@@ -4,7 +4,7 @@ import { api, type Entry, type Link, type MergedBook, type SearchResult, type So
 import { CoverCard } from "../components/CoverCard";
 import { CategoryTile } from "../components/CategoryTile";
 import { Rail } from "../components/Rail";
-import { openEntry } from "../lib/entry";
+import { openEntry, pickSubsections } from "../lib/entry";
 import { maybeApply as applyEnrichmentToEntry } from "../lib/enrichment";
 import { primaryBadge, formatLabel, isAudiobookEntry, hasBookFormat } from "../lib/format";
 import {
@@ -52,29 +52,6 @@ const SWR_TTL_MS = 10 * 60 * 1000;
 // fetch. Survives unmount/remount but is dropped on full app reload.
 let cachedBlocks: SourceBlock[] | null = null;
 let cachedAt = 0;
-
-function pickSubsections(navigation: Link[]): Link[] {
-  const skip = new Set([
-    "self",
-    "next",
-    "previous",
-    "prev",
-    "up",
-    "start",
-    "search",
-    "alternate",
-    "first",
-    "last",
-    "shelf",
-    "http://opds-spec.org/shelf",
-    "http://opds-spec.org/facet",
-    "http://opds-spec.org/featured",
-  ]);
-  return navigation.filter((l) => {
-    const r = (l.rel ?? "").toLowerCase();
-    return !skip.has(r) && !r.includes("opensearch");
-  });
-}
 
 export function Library() {
   const [blocks, setBlocks] = useState<SourceBlock[]>(() => cachedBlocks ?? []);

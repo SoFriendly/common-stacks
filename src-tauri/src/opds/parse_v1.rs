@@ -147,13 +147,24 @@ pub fn parse(bytes: &[u8], base_url: &str) -> Result<Feed> {
                         // <link rel="subsection".../></entry>) or a book entry
                         // that happens to use a subsection link to its detail
                         // page (Gutenberg pattern, with thumbnail + author in
-                        // <content>). Heuristic: if the entry has no cover,
-                        // no thumbnail, and no summary, treat it as nav.
+                        // <content>). A subsection link that declares the OPDS
+                        // catalog profile in its type points at another feed,
+                        // so the entry is nav even when it carries a blurb and
+                        // an icon thumbnail (COPS does both: "51 books" +
+                        // custom.png). Otherwise fall back to the heuristic:
+                        // no cover, no thumbnail, and no summary means nav.
+                        let links_to_catalog = ent.navigation.iter().any(|l| {
+                            matches!(l.rel.as_deref(), None | Some("subsection"))
+                                && l.mime
+                                    .as_deref()
+                                    .is_some_and(|m| m.contains("profile=opds-catalog"))
+                        });
                         let is_pure_nav = ent.acquisitions.is_empty()
                             && !ent.navigation.is_empty()
-                            && ent.cover.is_none()
-                            && ent.thumbnail.is_none()
-                            && ent.summary.is_none();
+                            && (links_to_catalog
+                                || (ent.cover.is_none()
+                                    && ent.thumbnail.is_none()
+                                    && ent.summary.is_none()));
                         if is_pure_nav {
                             let entry_title = if !ent.title.is_empty() {
                                 Some(ent.title.clone())
@@ -336,5 +347,49 @@ mod tests {
         let ent = &feed.entries[0];
         assert_eq!(ent.title, "Tom & Jerry");
         assert_eq!(ent.summary.as_deref(), Some("They weren't <b>ready</b>"));
+    }
+
+    #[test]
+    fn cops_nav_entries_with_blurb_and_icon_are_navigation() {
+        // COPS nav entries carry a content blurb and an icon thumbnail, but
+        // their subsection link types declare the OPDS catalog profile.
+        let xml = br#"<?xml version="1.0"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <title>Fantasy</title>
+    <id>cops:custom:54:1</id>
+    <content type="text">51 books</content>
+    <link href="/feed/custom/54/1" type="application/atom+xml;profile=opds-catalog;kind=acquisition" rel="subsection"/>
+    <link href="/images/custom.png" type="image/png" rel="http://opds-spec.org/image/thumbnail" title="icon"/>
+  </entry>
+</feed>"#;
+        let feed = parse(xml, "https://example.com/feed").unwrap();
+        assert!(feed.entries.is_empty());
+        assert_eq!(feed.navigation.len(), 1);
+        assert_eq!(feed.navigation[0].title.as_deref(), Some("Fantasy"));
+        assert_eq!(
+            feed.navigation[0].href,
+            "https://example.com/feed/custom/54/1"
+        );
+    }
+
+    #[test]
+    fn gutenberg_detail_link_entry_stays_a_book() {
+        // Gutenberg book entries link to their detail page with a bare
+        // atom type (no catalog profile) and carry a thumbnail — they must
+        // stay in entries so the Book page can resolve them.
+        let xml = br#"<?xml version="1.0"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <title>Frankenstein</title>
+    <id>urn:gutenberg:84</id>
+    <content type="text">Mary Shelley</content>
+    <link href="/ebooks/84" type="application/atom+xml" rel="subsection"/>
+    <link href="/cache/84/small.jpg" type="image/jpeg" rel="http://opds-spec.org/image/thumbnail"/>
+  </entry>
+</feed>"#;
+        let feed = parse(xml, "https://example.com/feed").unwrap();
+        assert_eq!(feed.entries.len(), 1);
+        assert_eq!(feed.entries[0].title, "Frankenstein");
     }
 }

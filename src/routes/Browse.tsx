@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { api, type Feed } from "../lib/api";
 import { CoverCard } from "../components/CoverCard";
 import { CategoryTile } from "../components/CategoryTile";
-import { openEntry } from "../lib/entry";
+import { openEntry, pickSubsections } from "../lib/entry";
 import { maybeApply as applyEnrichmentToEntry } from "../lib/enrichment";
 import { primaryBadge, formatLabel, isAudiobookEntry } from "../lib/format";
 import { useIsMobile } from "../lib/platform";
@@ -79,18 +79,7 @@ export function Browse() {
     navigate(`/browse?${p.toString()}`);
   }
 
-  const subsections =
-    feed?.navigation.filter((l) => {
-      const r = (l.rel ?? "").toLowerCase();
-      return (
-        r !== "self" &&
-        r !== "up" &&
-        r !== "start" &&
-        r !== "search" &&
-        r !== "alternate" &&
-        !r.includes("opensearch")
-      );
-    }) ?? [];
+  const subsections = feed ? pickSubsections(feed.navigation) : [];
 
   return (
     <div className={isMobile ? "px-4 pt-4 pb-4" : "px-6 pb-16"}>
