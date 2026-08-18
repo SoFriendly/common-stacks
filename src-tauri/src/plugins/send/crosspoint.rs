@@ -724,6 +724,7 @@ fn join_device_path(dir: &str, name: &str) -> String {
 mod runner {
     use super::RUNNER_LABEL;
     use anyhow::{anyhow, Result};
+    use tauri::utils::config::BackgroundThrottlingPolicy;
     use tauri::{AppHandle, Manager, WebviewUrl};
 
     pub fn open(app: &AppHandle, base: &str) -> Result<()> {
@@ -742,6 +743,11 @@ mod runner {
             .title("Crosspoint fulfillment")
             .visible(false)
             .skip_taskbar(true)
+            // A hidden WKWebView gets suspended by macOS background
+            // throttling (App Nap) at an arbitrary point mid-job, leaving the
+            // device's fulfillment job claimed but frozen until its lease
+            // expires. The runner exists to run while unseen; opt it out.
+            .background_throttling(BackgroundThrottlingPolicy::Disabled)
             .build()
             .map(|_| ())
             .map_err(|e| e.to_string());
